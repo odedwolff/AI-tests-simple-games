@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Simple Dodge Game</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    background: #0a0a1f;
+    font-family: Arial, Helvetica, sans-serif;
+    overflow: hidden;
+  }
+  canvas { display: block; }
+  #ui {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    color: #88ff88;
+    font-size: 22px;
+    pointer-events: none;
+    text-shadow: 0 0 6px #000;
+  }
+  #pauseBtn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0,255,136,0.15);
+    color: #0f8;
+    border: 2px solid #0f8;
+    border-radius: 8px;
+    font-size: 18px;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 8px 20px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #0f8;
+    box-shadow: 0 0 10px rgba(0,255,136,0.3);
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  #pauseBtn:hover { background: rgba(0,255,136,0.3); }
+</style>
+</head>
+<body>
+
+<div id="ui">Score: <span id="score">0</span></div>
+<button id="pauseBtn">⏸ Pause</button>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx    = canvas.getContext("2d");
+const scoreElement = document.getElementById("score");
+
+let W, H;
+
+// ── Player ────────────────────────────────────────────────────
+// Thin vertical paddle that rotates around its centre
+const PLAYER_W     = 16;    // thin
+const PLAYER_H     = 90;    // tall
+const ROTATE_SPEED = 0.045; // radians per frame
+
+const player = {
+  cx: 0, cy: 0,  // centre position (set in resize)
+  angle: 0,       // current rotation in radians
+};
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  player.cx = W - 220;
+  player.cy = H / 2;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ── Constants ─────────────────────────────────────────────────
+const SPEED_BLOCKS = 4.2;
+const SPEED_BALLS  = 9.5;
+const FREQ_BLOCKS  = 1300;
+const FREQ_BALLS   = 2100;
+
+// ── State ─────────────────────────────────────────────────────
+let blocks = [], balls = [];
+let score = 0;
+let flashRed = 0;
+let keys = {};
+let gameStarted = false;
+let paused = false;
+let last = 0;
+let blockTimer = FREQ_BLOCKS - 300;
+let ballTimer  = FREQ_BALLS  - 600;
+
+// ── Pause ─────────────────────────────────────────────────────
+const pauseBtn = document.getElementById("pauseBtn");
+pauseBtn.addEventListener("click", togglePause);
+
+function togglePause() {
+  if (!gameStarted) return;
+  paused = !paused;
+  pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
+  if (paused) last = 0;
+}
+
+// ── Spawn ─────────────────────────────────────────────────────
+function startGame() {
+  gameStarted = true;
+  spawnBlock(); spawnBlock(); spawnBall();
+}
+
+function spawnBlock() {
+  const size = 35 + Math.random() * 55;
+  blocks.push({
+    x: -size - 40,
+    y: 60 + Math.random() * (H - 120 - size),
+    w: size,
+    h: size * (0.6 + Math.random() * 0.8),
+    vx: SPEED_BLOCKS + Math.random() * 1.2
+  });
+}
+
+function spawnBall() {
+  const r = 12 + Math.random() * 10;
+  balls.push({
+    x: -60,
+    y: 60 + Math.random() * (H - 120),
+    r,
+    vx: SPEED_BALLS + Math.random() * 2.5,
+    vy: 0
+  });
+}
+
+// ── OBB collision helpers ─────────────────────────────────────
+
+// Get the 4 corners of the rotated player in world space
+function playerCorners() {
+  const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+  const hw = PLAYER_W / 2, hh = PLAYER_H / 2;
+  const corners = [
+    { x: -hw, y: -hh }, { x: hw, y: -hh },
+    { x:  hw, y:  hh }, { x: -hw, y:  hh }
+  ];
+  return corners.map(c => ({
+    x: player.cx + c.x * cos - c.y * sin,
+    y: player.cy + c.x * sin + c.y * cos
+  }));
+}
+
+// Project a set of points onto an axis, return [min, max]
+function project(points, axis) {
+  let min = Infinity, max = -Infinity;
+  for (const p of points) {
+    const d = p.x * axis.x + p.y * axis.y;
+    if (d < min) min = d;
+    if (d > max) max = d;
+  }
+  return [min, max];
+}
+
+// SAT overlap test: rotated player vs AABB block
+function playerVsRect(bx, by, bw, bh) {
+  const pCorners = playerCorners();
+  const bCorners = [
+    { x: bx,      y: by      }, { x: bx + bw, y: by      },
+    { x: bx + bw, y: by + bh }, { x: bx,      y: by + bh }
+  ];
+  const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+  const axes = [
+    { x: cos,  y: sin  },  // player local X
+    { x: -sin, y: cos  },  // player local Y
+    { x: 1,    y: 0    },  // block X
+    { x: 0,    y: 1    },  // block Y
+  ];
+  for (const axis of axes) {
+    const [pMin, pMax] = project(pCorners, axis);
+    const [bMin, bMax] = project(bCorners, axis);
+    if (pMax < bMin || bMax < pMin) return false;
+  }
+  return true;
+}
+
+// Circle vs rotated player — transform circle into player-local space
+function playerVsCircle(cx, cy, r) {
+  const cos = Math.cos(-player.angle), sin = Math.sin(-player.angle);
+  const dx = cx - player.cx, dy = cy - player.cy;
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  const hw = PLAYER_W / 2, hh = PLAYER_H / 2;
+  const nearX = Math.max(-hw, Math.min(lx, hw));
+  const nearY = Math.max(-hh, Math.min(ly, hh));
+  const dist  = Math.hypot(lx - nearX, ly - nearY);
+  return dist < r ? { dist, lx, ly } : null;
+}
+
+// ── Update ────────────────────────────────────────────────────
+function update() {
+  if (!gameStarted || paused) return;
+
+  // Rotate with left/right, move vertically with up/down
+  if (keys["ArrowLeft"]  || keys["KeyA"]) player.angle -= ROTATE_SPEED;
+  if (keys["ArrowRight"] || keys["KeyD"]) player.angle += ROTATE_SPEED;
+  if (keys["ArrowUp"]    || keys["KeyW"]) player.cy -= 9;
+  if (keys["ArrowDown"]  || keys["KeyS"]) player.cy += 9;
+  player.cy = Math.max(PLAYER_H / 2 + 10, Math.min(H - PLAYER_H / 2 - 10, player.cy));
+
+  // ── Blocks ──
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i];
+    b.x += b.vx;
+    if (playerVsRect(b.x, b.y, b.w, b.h)) {
+      flashRed = 16;
+      blocks.splice(i, 1);
+      continue;
+    }
+    if (b.x > W + 100) { blocks.splice(i, 1); score += 10; }
+  }
+
+  // ── Balls ──
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    b.x += b.vx;
+    b.y += b.vy;
+
+    const ballCX = b.x + b.r;
+    const ballCY = b.y + b.r;
+    const hit = playerVsCircle(ballCX, ballCY, b.r);
+
+    if (hit) {
+      // Build the world-space normal pointing from player centre toward the ball
+      const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+      let nx = cos, ny = sin;
+      const toBallX = ballCX - player.cx, toBallY = ballCY - player.cy;
+      if (nx * toBallX + ny * toBallY < 0) { nx = -nx; ny = -ny; }
+
+      // Reflect velocity off that normal
+      const dot = b.vx * nx + b.vy * ny;
+      b.vx = (b.vx - 2 * dot * nx) * 1.05;
+      b.vy = (b.vy - 2 * dot * ny) * 1.05;
+
+      // Separate the ball
+      const sep = b.r - hit.dist + 2;
+      b.x += nx * sep;
+      b.y += ny * sep;
+      continue;
+    }
+
+    // Deflected ball destroys oncoming block
+    if (b.vx < 0) {
+      for (let j = blocks.length - 1; j >= 0; j--) {
+        const bl = blocks[j];
+        if (bl.vx > 0 &&
+            ballCX + b.r > bl.x && ballCX - b.r < bl.x + bl.w &&
+            ballCY + b.r > bl.y && ballCY - b.r < bl.y + bl.h) {
+          blocks.splice(j, 1);
+          score += 50;
+        }
+      }
+    }
+
+    if (b.x > W + 100) { balls.splice(i, 1); score += 25; }
+    if (b.x < -100)    { balls.splice(i, 1); score += 60; }
+  }
+
+  scoreElement.textContent = score;
+}
+
+// ── Draw ──────────────────────────────────────────────────────
+function draw() {
+  ctx.fillStyle = flashRed > 0 ? "#500" : "#111133";
+  ctx.fillRect(0, 0, W, H);
+  if (flashRed > 0) flashRed--;
+
+  if (!gameStarted) {
+    ctx.fillStyle = "white";
+    ctx.font = "bold 60px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("PRESS ← → TO START", W/2, H/2 - 10);
+    ctx.font = "28px Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillText("← → rotate  ·  ↑ ↓ move  ·  deflect balls  ·  dodge blocks", W/2, H/2 + 50);
+    return;
+  }
+
+  // Blocks
+  ctx.fillStyle = "#e33";
+  for (const b of blocks) ctx.fillRect(b.x, b.y, b.w, b.h);
+
+  // Balls
+  ctx.fillStyle = "#ff3";
+  ctx.shadowColor = "#fa3"; ctx.shadowBlur = 12;
+  for (const b of balls) {
+    ctx.beginPath();
+    ctx.arc(b.x + b.r, b.y + b.r, b.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // Player – thin rotated paddle
+  ctx.save();
+  ctx.translate(player.cx, player.cy);
+  ctx.rotate(player.angle);
+  ctx.fillStyle = "#0f8";
+  ctx.shadowColor = "#0f8";
+  ctx.shadowBlur = 25;
+  ctx.fillRect(-PLAYER_W / 2, -PLAYER_H / 2, PLAYER_W, PLAYER_H);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-PLAYER_W / 2 - 3, -PLAYER_H / 2 - 3, PLAYER_W + 6, PLAYER_H + 6);
+  ctx.restore();
+
+  // Pause overlay
+  if (paused) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#0f8";
+    ctx.shadowColor = "#0f8";
+    ctx.shadowBlur = 25;
+    ctx.font = "bold 90px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("PAUSED", W/2, H/2 - 30);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "28px Arial";
+    ctx.fillText("Press  P  or  Esc  to resume", W/2, H/2 + 45);
+  }
+}
+
+// ── Loop ──────────────────────────────────────────────────────
+function loop(ts) {
+  if (!last) last = ts;
+  last = ts;
+
+  if (gameStarted && !paused) {
+    blockTimer += 16; ballTimer += 16;
+    if (blockTimer >= FREQ_BLOCKS) { spawnBlock(); blockTimer -= FREQ_BLOCKS; }
+    if (ballTimer  >= FREQ_BALLS)  { spawnBall();  ballTimer  -= FREQ_BALLS;  }
+  }
+
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── Controls ──────────────────────────────────────────────────
+window.addEventListener("keydown", e => {
+  keys[e.code] = true;
+  if (!gameStarted && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","KeyA","KeyD","KeyW","KeyS"].includes(e.code)) {
+    startGame();
+    return;
+  }
+  if (e.code === "KeyP" || e.code === "Escape") togglePause();
+});
+window.addEventListener("keyup", e => { keys[e.code] = false; });
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

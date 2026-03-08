@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PADDLE — A gravity game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a18;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #c8c4bc;
+  }
+
+  #ui-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 800px;
+    padding: 0 4px 8px 4px;
+  }
+
+  #title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    letter-spacing: 0.15em;
+    color: #e8845a;
+    line-height: 1;
+  }
+
+  #hint {
+    font-size: 0.65rem;
+    color: #706c64;
+    text-align: right;
+    line-height: 1.7;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    border: 1px solid #3a3830;
+    box-shadow: 0 0 40px rgba(232,132,90,0.08), 0 0 0 1px #2a2820;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20,20,18,0.82);
+    font-family: 'Bebas Neue', sans-serif;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  #overlay.visible { opacity: 1; }
+
+  #overlay .big {
+    font-size: 5rem;
+    color: #e8845a;
+    letter-spacing: 0.1em;
+    line-height: 1;
+  }
+
+  #overlay .sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: #8a8680;
+    margin-top: 10px;
+  }
+
+  #ui-bottom {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 800px;
+    padding: 8px 4px 0 4px;
+  }
+
+  .paddle-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: #706c64;
+  }
+
+  .paddle-status .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #3a3830;
+    transition: background 0.2s;
+  }
+
+  .paddle-status.active .dot { background: #e8845a; }
+  .paddle-status.active { color: #c8c4bc; }
+</style>
+</head>
+<body>
+
+<div id="ui-top">
+  <div id="title">PADDLE</div>
+  <div id="hint">
+    ↑↓ MOVE &nbsp;|&nbsp; ←→ ROTATE &nbsp;|&nbsp; TAB SWITCH
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="gc"></canvas>
+  <div id="overlay">
+    <div class="big" id="overlay-text">3</div>
+    <div class="sub" id="overlay-sub">ball out of bounds</div>
+  </div>
+</div>
+
+<div id="ui-bottom">
+  <div class="paddle-status active" id="p1-status">
+    <div class="dot"></div>
+    <span>PADDLE 1</span>
+  </div>
+  <div class="paddle-status" id="p2-status">
+    <div class="dot"></div>
+    <span>PADDLE 2</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const overlayText = document.getElementById('overlay-text');
+const overlaySub = document.getElementById('overlay-sub');
+const p1Status = document.getElementById('p1-status');
+const p2Status = document.getElementById('p2-status');
+
+// ── responsive sizing ──────────────────────────────────────────────────────
+function resize() {
+  const maxW = Math.min(window.innerWidth - 32, 800);
+  const maxH = Math.min(window.innerHeight - 160, 600);
+  const side = Math.min(maxW, maxH * 4 / 3);
+  canvas.width  = Math.floor(side);
+  canvas.height = Math.floor(side * 3 / 4);
+  D = canvas.width / 200;
+  initGame();
+}
+
+let D; // d-pixel size in real pixels
+
+// ── constants ─────────────────────────────────────────────────────────────
+const AVT_WIDTH  = 20;  // d-px
+const AVT_THICK  = 3;   // d-px
+const BALL_RAD   = 5;   // d-px
+const G          = 10;   // d-px / s²
+const INIT_SPEED = 50;  // d-px / s
+const INIT_ANGLE = 45;  // degrees (from horizontal)
+const MOVE_SPEED = 80;  // d-px / s
+const ROT_SPEED  = 90;  // degrees / s
+
+// ── game state ─────────────────────────────────────────────────────────────
+let paddles, ball, activePlayer, keys, lastTime, countdownActive, countdownVal;
+
+function dp(n) { return n * D; } // convert d-px → real px
+
+function initGame() {
+  const W = canvas.width, H = canvas.height;
+
+  paddles = [
+    {
+      x: W * 0.25,
+      y: H * 0.5,
+      angle: 0,    // radians
+      active: true
+    },
+    {
+      x: W * 0.75,
+      y: H * 0.5,
+      angle: 0,
+      active: false
+    }
+  ];
+
+  ball = {
+    x: dp(BALL_RAD) + 2,
+    y: H - dp(BALL_RAD) - 2,
+    vx: INIT_SPEED * Math.cos(INIT_ANGLE * Math.PI / 180) * D,
+    vy: -INIT_SPEED * Math.sin(INIT_ANGLE * Math.PI / 180) * D
+  };
+
+  activePlayer = 0;
+  countdownActive = false;
+  overlay.classList.remove('visible');
+}
+
+keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    switchPlayer();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+function switchPlayer() {
+  activePlayer = activePlayer === 0 ? 1 : 0;
+  paddles[0].active = activePlayer === 0;
+  paddles[1].active = activePlayer === 1;
+  updateStatusUI();
+}
+
+function updateStatusUI() {
+  p1Status.classList.toggle('active', activePlayer === 0);
+  p2Status.classList.toggle('active', activePlayer === 1);
+}
+
+// ── physics ────────────────────────────────────────────────────────────────
+function update(dt) {
+  if (countdownActive) return;
+
+  const W = canvas.width, H = canvas.height;
+  const p = paddles[activePlayer];
+
+  // paddle movement
+  if (keys['ArrowUp'])    p.y -= dp(MOVE_SPEED) * dt;
+  if (keys['ArrowDown'])  p.y += dp(MOVE_SPEED) * dt;
+  if (keys['ArrowLeft'])  p.angle -= ROT_SPEED * Math.PI / 180 * dt;
+  if (keys['ArrowRight']) p.angle += ROT_SPEED * Math.PI / 180 * dt;
+
+  // clamp paddles inside screen
+  paddles.forEach(pad => {
+    const hw = dp(AVT_WIDTH / 2), ht = dp(AVT_THICK / 2);
+    const r = Math.sqrt(hw * hw + ht * ht);
+    pad.x = Math.max(r, Math.min(W - r, pad.x));
+    pad.y = Math.max(r, Math.min(H - r, pad.y));
+  });
+
+  // gravity
+  ball.vy += dp(G) * dt;
+
+  // ball movement
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  // wall bounce
+  const br = dp(BALL_RAD);
+  if (ball.x - br < 0)  { ball.x = br;    ball.vx =  Math.abs(ball.vx); }
+  if (ball.x + br > W)  { ball.x = W - br; ball.vx = -Math.abs(ball.vx); }
+  if (ball.y - br < 0)  { ball.y = br;    ball.vy =  Math.abs(ball.vy); }
+
+  // paddle collision
+  paddles.forEach(pad => collidePaddleBall(pad));
+
+  // out of bottom
+  if (ball.y - br > H) {
+    startCountdown();
+  }
+}
+
+function collidePaddleBall(pad) {
+  // transform ball into paddle local space
+  const dx = ball.x - pad.x;
+  const dy = ball.y - pad.y;
+  const cos = Math.cos(-pad.angle);
+  const sin = Math.sin(-pad.angle);
+  const lx = cos * dx - sin * dy;
+  const ly = sin * dx + cos * dy;
+
+  const hw = dp(AVT_WIDTH / 2);
+  const ht = dp(AVT_THICK / 2);
+  const br = dp(BALL_RAD);
+
+  // closest point on paddle rect to ball center (local)
+  const cx = Math.max(-hw, Math.min(hw, lx));
+  const cy = Math.max(-ht, Math.min(ht, ly));
+
+  const ddx = lx - cx;
+  const ddy = ly - cy;
+  const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+
+  if (dist < br && dist > 0.001) {
+    // normal in local space
+    const nx = ddx / dist;
+    const ny = ddy / dist;
+
+    // push ball out of paddle (local)
+    const overlap = br - dist;
+    const newLx = lx + nx * overlap;
+    const newLy = ly + ny * overlap;
+
+    // back to world space
+    const cos2 = Math.cos(pad.angle);
+    const sin2 = Math.sin(pad.angle);
+    ball.x = pad.x + cos2 * newLx - sin2 * newLy;
+    ball.y = pad.y + sin2 * newLx + cos2 * newLy;
+
+    // reflect velocity
+    const vLx = Math.cos(-pad.angle) * ball.vx - Math.sin(-pad.angle) * ball.vy;
+    const vLy = Math.sin(-pad.angle) * ball.vx + Math.cos(-pad.angle) * ball.vy;
+    const dot = vLx * nx + vLy * ny;
+    const rVLx = vLx - 2 * dot * nx;
+    const rVLy = vLy - 2 * dot * ny;
+    ball.vx = Math.cos(pad.angle) * rVLx - Math.sin(pad.angle) * rVLy;
+    ball.vy = Math.sin(pad.angle) * rVLx + Math.cos(pad.angle) * rVLy;
+  }
+}
+
+// ── countdown & reset ─────────────────────────────────────────────────────
+function startCountdown() {
+  countdownActive = true;
+  countdownVal = 3;
+  overlaySub.textContent = 'ball out of bounds';
+  overlayText.textContent = countdownVal;
+  overlay.classList.add('visible');
+
+  const tick = () => {
+    countdownVal--;
+    if (countdownVal <= 0) {
+      initGame();
+    } else {
+      overlayText.textContent = countdownVal;
+      setTimeout(tick, 900);
+    }
+  };
+  setTimeout(tick, 900);
+}
+
+// ── drawing ────────────────────────────────────────────────────────────────
+function drawPaddle(pad) {
+  ctx.save();
+  ctx.translate(pad.x, pad.y);
+  ctx.rotate(pad.angle);
+
+  const hw = dp(AVT_WIDTH / 2);
+  const ht = dp(AVT_THICK / 2);
+
+  if (pad.active) {
+    // glow
+    ctx.shadowColor = 'rgba(232,132,90,0.5)';
+    ctx.shadowBlur = dp(6);
+    ctx.fillStyle = '#e8845a';
+  } else {
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#585450';
+  }
+
+  ctx.fillRect(-hw, -ht, dp(AVT_WIDTH), dp(AVT_THICK));
+
+  // end caps
+  ctx.beginPath();
+  ctx.arc(-hw, 0, ht, 0, Math.PI * 2);
+  ctx.arc( hw, 0, ht, 0, Math.PI * 2);
+  ctx.fill();
+
+  // center dot
+  ctx.beginPath();
+  ctx.arc(0, 0, dp(0.8), 0, Math.PI * 2);
+  ctx.fillStyle = pad.active ? 'rgba(255,220,200,0.6)' : 'rgba(120,115,110,0.4)';
+  ctx.shadowBlur = 0;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawBall() {
+  const br = dp(BALL_RAD);
+  // shadow
+  ctx.beginPath();
+  ctx.arc(ball.x + dp(1), ball.y + dp(1), br, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fill();
+
+  // ball
+  const grad = ctx.createRadialGradient(
+    ball.x - br * 0.3, ball.y - br * 0.3, br * 0.1,
+    ball.x, ball.y, br
+  );
+  grad.addColorStop(0, '#f0ece4');
+  grad.addColorStop(0.5, '#b8b4ac');
+  grad.addColorStop(1, '#787470');
+
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, br, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+function drawBackground() {
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#201e1c';
+  ctx.fillRect(0, 0, W, H);
+
+  // subtle grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 0.5;
+  const gs = dp(20);
+  for (let x = 0; x < W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // corner marks
+  const m = dp(8);
+  ctx.strokeStyle = 'rgba(232,132,90,0.25)';
+  ctx.lineWidth = 1;
+  [[0,0,1,1],[W,0,-1,1],[0,H,1,-1],[W,H,-1,-1]].forEach(([cx,cy,sx,sy]) => {
+    ctx.beginPath(); ctx.moveTo(cx + sx*m, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy*m); ctx.stroke();
+  });
+
+  // bottom danger zone
+  const dh = dp(4);
+  const dangerGrad = ctx.createLinearGradient(0, H - dh, 0, H);
+  dangerGrad.addColorStop(0, 'rgba(200,80,40,0)');
+  dangerGrad.addColorStop(1, 'rgba(200,80,40,0.15)');
+  ctx.fillStyle = dangerGrad;
+  ctx.fillRect(0, H - dh, W, dh);
+}
+
+// ── loop ───────────────────────────────────────────────────────────────────
+function loop(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  update(dt);
+
+  drawBackground();
+  paddles.forEach(drawPaddle);
+  drawBall();
+
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize', resize);
+resize();
+updateStatusUI();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

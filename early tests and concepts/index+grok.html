@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Rectangle Dodger</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    background: #0a0e17;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  #info {
+    color: #88f;
+    font-size: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  #gameContainer {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+  }
+  canvas {
+    background: #0f1625;
+    border: 1px solid #334;
+    image-rendering: pixelated;
+  }
+  #controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #88f;
+    min-width: 200px;
+  }
+  #controls > div:first-child {
+    font-size: 24px;
+    margin-bottom: 15px;
+    font-weight: bold;
+  }
+  #diffValue {
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  input[type=range] {
+    width: 200px;
+    height: 10px;
+    background: #334;
+    border-radius: 5px;
+    accent-color: #44ffff;
+    outline: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="info">Use ↑ ↓ arrows (or W S) to dodge!</div>
+<div id="gameContainer">
+  <canvas id="c" width="800" height="500"></canvas>
+  <div id="controls">
+    <div>Difficulty</div>
+    <input type="range" id="diffSlider" min="1" max="10" value="5" step="1">
+    <div id="diffValue">5</div>
+  </div>
+</div>
+
+<script>
+// === GAME CODE ===
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const player = {
+  x: 100,
+  y: canvas.height / 2 - 27,
+  w: 40,
+  h: 60,
+  speed: 380  // px/sec
+};
+
+let obstacles = [];
+let flashTime = 0;
+let lastSpawn = 999;           // ← start ready to spawn immediately
+let score = 0;
+let difficulty = 5;
+
+const keys = {};
+
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup',   e => keys[e.key.toLowerCase()] = false);
+
+// Difficulty slider
+document.getElementById('diffSlider').addEventListener('input', (e) => {
+  difficulty = parseInt(e.target.value);
+  document.getElementById('diffValue').textContent = difficulty;
+
+  e.target.blur();
+});
+
+function spawnObstacle() {
+  const h = 50 + Math.random() * 100;
+  obstacles.push({
+    x: canvas.width + 60,
+    y: Math.random() * (canvas.height - h - 20) + 10,
+    w: 50 + Math.random() * 40,
+    h: h,
+    speed: 220 + Math.random() * 180 + (difficulty * 35)   // 255–570 px/s range
+  });
+}
+
+function update(dt) {
+  // Player movement
+  if (keys['arrowup'] || keys['w'])    player.y -= player.speed * dt;
+  if (keys['arrowdown'] || keys['s'])  player.y += player.speed * dt;
+
+  player.y = Math.max(10, Math.min(canvas.height - player.h - 10, player.y));
+
+  // Spawning
+  lastSpawn += dt;
+  const spawnDelay = 1.8 - (difficulty * 0.14); // ~1.66s at diff 1 → ~0.4s at diff 10
+  if (lastSpawn > spawnDelay) {
+    spawnObstacle();
+    lastSpawn = 0;
+  }
+
+  // Obstacles
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const o = obstacles[i];
+    o.x -= o.speed * dt;
+
+    // Collision
+    if (
+      player.x + player.w > o.x &&
+      player.x < o.x + o.w &&
+      player.y + player.h > o.y &&
+      player.y < o.y + o.h
+    ) {
+      flashTime = 0.32;
+      obstacles.splice(i, 1);
+      continue;
+    }
+
+    // Score when passed
+    if (o.x + o.w < 0) {
+      obstacles.splice(i, 1);
+      score++;
+    }
+  }
+
+  if (flashTime > 0) flashTime -= dt;
+}
+
+function draw() {
+  ctx.fillStyle = '#0f1625';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Red flash
+  if (flashTime > 0) {
+    const alpha = flashTime / 0.32 * 0.5;
+    ctx.fillStyle = `rgba(200, 20, 20, ${alpha})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Player
+  ctx.fillStyle = '#44ddff';
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.strokeStyle = '#88ffff';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(player.x, player.y, player.w, player.h);
+
+  // Obstacles
+  ctx.fillStyle = '#ff7733';
+  for (const o of obstacles) {
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+  }
+
+  // Score
+  ctx.fillStyle = '#88f';
+  ctx.font = 'bold 26px Arial';
+  ctx.fillText(`Score: ${score}`, 20, 40);
+}
+
+let lastTime = 0;
+function loop(time = 0) {
+  const dt = Math.min((time - lastTime) / 1000, 0.06);
+  lastTime = time;
+
+  update(dt);
+  draw();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
