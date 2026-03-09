@@ -3,455 +3,653 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PADDLE — A gravity game</title>
+<title>PADDLE DUEL</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a1a;
+    --panel-bg: #141414;
+    --game-bg: #111;
+    --border: #2a2a2a;
+    --green: #39ff14;
+    --green-dim: #1a6600;
+    --yellow: #f5c400;
+    --orange: #ff6b00;
+    --gray-light: #888;
+    --gray-mid: #444;
+    --text: #ccc;
+  }
 
   body {
-    background: #1a1a18;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    font-family: 'Share Tech Mono', monospace;
-    color: #c8c4bc;
+    overflow: hidden;
+    user-select: none;
   }
 
-  #ui-top {
+  #root {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    width: 100%;
-    max-width: 800px;
-    padding: 0 4px 8px 4px;
-  }
-
-  #title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2.4rem;
-    letter-spacing: 0.15em;
-    color: #e8845a;
-    line-height: 1;
-  }
-
-  #hint {
-    font-size: 0.65rem;
-    color: #706c64;
-    text-align: right;
-    line-height: 1.7;
-  }
-
-  #canvas-wrap {
-    position: relative;
-    border: 1px solid #3a3830;
-    box-shadow: 0 0 40px rgba(232,132,90,0.08), 0 0 0 1px #2a2820;
-  }
-
-  canvas {
-    display: block;
-  }
-
-  #overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
     align-items: center;
     justify-content: center;
-    background: rgba(20,20,18,0.82);
-    font-family: 'Bebas Neue', sans-serif;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.25s;
   }
 
-  #overlay.visible { opacity: 1; }
-
-  #overlay .big {
-    font-size: 5rem;
-    color: #e8845a;
-    letter-spacing: 0.1em;
-    line-height: 1;
-  }
-
-  #overlay .sub {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.8rem;
-    color: #8a8680;
-    margin-top: 10px;
-  }
-
-  #ui-bottom {
+  #layout {
     display: flex;
-    justify-content: space-between;
     width: 100%;
-    max-width: 800px;
-    padding: 8px 4px 0 4px;
+    height: 100%;
+    align-items: stretch;
   }
 
-  .paddle-status {
+  .side-panel {
+    flex: 0 0 150px; /* 150 d-pixels wide — approximated as 150/1000 of screen width, but we use flex here */
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 10px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+  }
+
+  #left-panel { border-right: 1px solid var(--green-dim); }
+  #right-panel { border-left: 1px solid var(--green-dim); align-items: center; }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--green-dim);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ctrl-label {
+    font-size: 9px;
+    color: var(--gray-light);
+    letter-spacing: 1px;
+  }
+
+  .ctrl-val {
+    font-size: 12px;
+    color: var(--yellow);
+    font-family: 'Orbitron', monospace;
+  }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--green);
+    cursor: pointer;
+    height: 4px;
+  }
+
+  #game-area {
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.7rem;
-    color: #706c64;
+    justify-content: center;
+    padding: 10px 0;
+    background: var(--bg);
   }
 
-  .paddle-status .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #3a3830;
-    transition: background 0.2s;
+  #gameCanvas {
+    display: block;
+    background: var(--game-bg);
+    border: 1px solid var(--green-dim);
+    box-shadow: 0 0 30px rgba(57,255,20,0.06), inset 0 0 60px rgba(0,0,0,0.8);
+    image-rendering: crisp-edges;
   }
 
-  .paddle-status.active .dot { background: #e8845a; }
-  .paddle-status.active { color: #c8c4bc; }
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+    border: 1px solid var(--orange);
+    background: transparent;
+    color: var(--orange);
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 100%;
+    transition: all 0.15s;
+    margin-bottom: 6px;
+  }
+  .btn:hover { background: var(--orange); color: #111; }
+  .btn.green { border-color: var(--green); color: var(--green); }
+  .btn.green:hover { background: var(--green); color: #111; }
+
+  #status-box {
+    width: 100%;
+    font-size: 9px;
+    color: var(--gray-light);
+    border: 1px solid var(--border);
+    padding: 8px;
+    line-height: 1.8;
+    margin-top: 8px;
+  }
+  #status-box span { color: var(--yellow); }
+
+  .active-indicator {
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    border: 1px solid;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .p1-active { border-color: var(--green); color: var(--green); }
+  .p2-active { border-color: var(--orange); color: var(--orange); }
 </style>
 </head>
 <body>
+<div id="root">
+  <div id="layout">
+    <!-- LEFT: Dev Panel -->
+    <div class="side-panel" id="left-panel">
+      <div class="panel-title">// dev params</div>
 
-<div id="ui-top">
-  <div id="title">PADDLE</div>
-  <div id="hint">
-    ↑↓ MOVE &nbsp;|&nbsp; ←→ ROTATE &nbsp;|&nbsp; TAB SWITCH
-  </div>
-</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">GRAVITY G</div>
+        <div class="ctrl-val" id="g-val">15</div>
+        <input type="range" id="g-slider" min="0" max="100" step="1" value="15">
+      </div>
 
-<div id="canvas-wrap">
-  <canvas id="gc"></canvas>
-  <div id="overlay">
-    <div class="big" id="overlay-text">3</div>
-    <div class="sub" id="overlay-sub">ball out of bounds</div>
-  </div>
-</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">INIT SPEED</div>
+        <div class="ctrl-val" id="speed-val">150</div>
+        <input type="range" id="speed-slider" min="50" max="400" step="10" value="150">
+      </div>
 
-<div id="ui-bottom">
-  <div class="paddle-status active" id="p1-status">
-    <div class="dot"></div>
-    <span>PADDLE 1</span>
-  </div>
-  <div class="paddle-status" id="p2-status">
-    <div class="dot"></div>
-    <span>PADDLE 2</span>
+      <div class="ctrl-row">
+        <div class="ctrl-label">LAUNCH ANGLE °</div>
+        <div class="ctrl-val" id="angle-val">45</div>
+        <input type="range" id="angle-slider" min="10" max="80" step="1" value="45">
+      </div>
+
+      <div style="margin-top:8px; font-size:8px; color: var(--gray-mid); line-height:1.7;">
+        ARROWS: move<br>
+        CTRL+←→: rotate<br>
+        TAB: switch paddle
+      </div>
+    </div>
+
+    <!-- CENTER: Game Canvas -->
+    <div id="game-area">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- RIGHT: Controls -->
+    <div class="side-panel" id="right-panel">
+      <div class="panel-title">// controls</div>
+
+      <div id="active-disp" class="active-indicator p1-active">P1 ACTIVE</div>
+
+      <button class="btn green" id="btn-restart">⟳ RESTART</button>
+      <button class="btn" id="btn-pause">⏸ PAUSE</button>
+
+      <div id="status-box">
+        STATUS<br>
+        BALL VX: <span id="info-vx">0</span><br>
+        BALL VY: <span id="info-vy">0</span><br>
+        BALL X: <span id="info-bx">0</span><br>
+        BALL Y: <span id="info-by">0</span><br>
+        BOUNCES: <span id="info-b">0</span>
+      </div>
+
+      <div style="margin-top: auto; font-size: 8px; color: var(--gray-mid); line-height: 1.7; text-align:center;">
+        PADDLE DUEL<br>v1.0
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-const canvas = document.getElementById('gc');
-const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
-const overlayText = document.getElementById('overlay-text');
-const overlaySub = document.getElementById('overlay-sub');
-const p1Status = document.getElementById('p1-status');
-const p2Status = document.getElementById('p2-status');
+// ─── Constants ───────────────────────────────────────────────────────────────
+const AVT_WIDTH = 75;   // d-pixels
+const AVT_THICK = 10;   // d-pixels
+const BALL_RAD  = 5;    // d-pixels
+const ROT_SPEED = 90;   // degrees per second
+const MOVE_SPEED = 200; // d-pixels/sec for paddle movement
+const COUNTDOWN = 3;    // seconds
 
-// ── responsive sizing ──────────────────────────────────────────────────────
+// ─── Game state ───────────────────────────────────────────────────────────────
+let G           = 15;
+let INIT_SPEED  = 150;
+let INIT_ANGLE  = 45;
+
+let canvas, ctx;
+let W, H, DPX; // canvas W, H, and d-pixel size in real pixels
+let animId;
+let lastTime = 0;
+let paused = false;
+let bounces = 0;
+
+let ball, paddles, activePaddle;
+let countdownTimer = 0;
+let inCountdown = false;
+let keys = {};
+
+// ─── Resize & DPX ─────────────────────────────────────────────────────────────
 function resize() {
-  const maxW = Math.min(window.innerWidth - 32, 800);
-  const maxH = Math.min(window.innerHeight - 160, 600);
-  const side = Math.min(maxW, maxH * 4 / 3);
-  canvas.width  = Math.floor(side);
-  canvas.height = Math.floor(side * 3 / 4);
-  D = canvas.width / 200;
-  initGame();
+  const gameArea = document.getElementById('game-area');
+  const sidePx   = 150; // side panel px — we use a fixed pixel width approach
+  // DPX: 1 d-pixel = 1/1000 of screen width
+  DPX = window.innerWidth / 1000;
+  // Canvas fills game-area minus vertical margins (10 d-pixels top+bottom = 20dpx)
+  W = gameArea.clientWidth;
+  H = gameArea.clientHeight - 20 * DPX * 2;
+  if (H < 100) H = gameArea.clientHeight * 0.9;
+  canvas.width  = W;
+  canvas.height = H;
 }
 
-let D; // d-pixel size in real pixels
+// ─── d-pixel → canvas pixel helpers ──────────────────────────────────────────
+const dp  = v => v * DPX;          // d-pixels to canvas pixels
+const dpv = (x, y) => ({x: dp(x), y: dp(y)});
 
-// ── constants ─────────────────────────────────────────────────────────────
-const AVT_WIDTH  = 20;  // d-px
-const AVT_THICK  = 3;   // d-px
-const BALL_RAD   = 5;   // d-px
-const G          = 15;   // d-px / s²
-const INIT_SPEED = 150;  // d-px / s
-const INIT_ANGLE = 45;  // degrees (from horizontal)
-const MOVE_SPEED = 80;  // d-px / s
-const ROT_SPEED  = 90;  // degrees / s
-
-// ── game state ─────────────────────────────────────────────────────────────
-let paddles, ball, activePlayer, keys, lastTime, countdownActive, countdownVal;
-
-function dp(n) { return n * D; } // convert d-px → real px
-
+// ─── Init Game ────────────────────────────────────────────────────────────────
 function initGame() {
-  const W = canvas.width, H = canvas.height;
+  bounces = 0;
+  inCountdown = false;
+  countdownTimer = 0;
 
+  // Ball starts at bottom-left corner area
+  ball = {
+    x: dp(BALL_RAD + 2),
+    y: H - dp(BALL_RAD + 2),
+    vx: dp(INIT_SPEED) * Math.cos(INIT_ANGLE * Math.PI / 180),
+    vy: -dp(INIT_SPEED) * Math.sin(INIT_ANGLE * Math.PI / 180),
+  };
+
+  // Paddle dimensions
+  const pw = dp(AVT_WIDTH);
+  const pt = dp(AVT_THICK);
+
+  // P1: left side, vertical orientation (rotated 90deg so length is vertical)
   paddles = [
     {
-      x: W * 0.25,
-      y: H * 0.5,
-      angle: 0,    // radians
-      active: true
+      x: dp(30),
+      y: H / 2,
+      angle: 90,   // degrees; 0 = horizontal (length along x), 90 = vertical
+      color1: '#39ff14',
+      color2: '#1a6600',
+      name: 'P1',
     },
     {
-      x: W * 0.75,
-      y: H * 0.5,
-      angle: 0,
-      active: false
+      x: W - dp(30),
+      y: H / 2,
+      angle: 90,
+      color1: '#ff6b00',
+      color2: '#7a3200',
+      name: 'P2',
     }
   ];
 
-  ball = {
-    x: dp(BALL_RAD) + 2,
-    y: H - dp(BALL_RAD) - 2,
-    vx: INIT_SPEED * Math.cos(INIT_ANGLE * Math.PI / 180) * D,
-    vy: -INIT_SPEED * Math.sin(INIT_ANGLE * Math.PI / 180) * D
-  };
-
-  activePlayer = 0;
-  countdownActive = false;
-  overlay.classList.remove('visible');
+  activePaddle = 0;
+  updateActiveDisplay();
 }
 
-keys = {};
-window.addEventListener('keydown', e => {
-  keys[e.key] = true;
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    switchPlayer();
-  }
-});
-window.addEventListener('keyup', e => { keys[e.key] = false; });
-
-function switchPlayer() {
-  activePlayer = activePlayer === 0 ? 1 : 0;
-  paddles[0].active = activePlayer === 0;
-  paddles[1].active = activePlayer === 1;
-  updateStatusUI();
+// ─── Paddle geometry helpers ──────────────────────────────────────────────────
+// Returns 4 corners of paddle in world space
+function paddleCorners(p) {
+  const hw = dp(AVT_WIDTH) / 2;
+  const ht = dp(AVT_THICK) / 2;
+  const a  = p.angle * Math.PI / 180;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  // Local corners: ±hw along local-x, ±ht along local-y
+  const lc = [
+    { lx:  hw, ly:  ht },
+    { lx: -hw, ly:  ht },
+    { lx: -hw, ly: -ht },
+    { lx:  hw, ly: -ht },
+  ];
+  return lc.map(c => ({
+    x: p.x + c.lx * ca - c.ly * sa,
+    y: p.y + c.lx * sa + c.ly * ca,
+  }));
 }
 
-function updateStatusUI() {
-  p1Status.classList.toggle('active', activePlayer === 0);
-  p2Status.classList.toggle('active', activePlayer === 1);
+// ─── Collision: ball vs paddle ────────────────────────────────────────────────
+function collideBallPaddle(ball, paddle) {
+  const r  = dp(BALL_RAD);
+  const a  = paddle.angle * Math.PI / 180;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  // Transform ball to paddle local space
+  const dx = ball.x - paddle.x;
+  const dy = ball.y - paddle.y;
+  const lx =  dx * ca + dy * sa;
+  const ly = -dx * sa + dy * ca;
+  const hw = dp(AVT_WIDTH) / 2;
+  const ht = dp(AVT_THICK) / 2;
+
+  // Expanded box for collision
+  if (Math.abs(lx) > hw + r || Math.abs(ly) > ht + r) return false;
+
+  // Find closest point on paddle rect to ball center
+  const clampedX = Math.max(-hw, Math.min(hw, lx));
+  const clampedY = Math.max(-ht, Math.min(ht, ly));
+  const distX    = lx - clampedX;
+  const distY    = ly - clampedY;
+  const dist2    = distX * distX + distY * distY;
+  if (dist2 >= r * r) return false;
+
+  // Normal in local space
+  const dist   = Math.sqrt(dist2) || 0.001;
+  const nx_loc = distX / dist;
+  const ny_loc = distY / dist;
+  // Back to world space
+  const nx =  nx_loc * ca - ny_loc * sa;
+  const ny =  nx_loc * sa + ny_loc * ca;
+
+  // Reflect velocity
+  const dot = ball.vx * nx + ball.vy * ny;
+  if (dot >= 0) return false; // moving away already
+  ball.vx -= 2 * dot * nx;
+  ball.vy -= 2 * dot * ny;
+
+  // Push ball outside
+  const overlap = r - dist;
+  ball.x += nx * (overlap + 0.5);
+  ball.y += ny * (overlap + 0.5);
+
+  return true;
 }
 
-// ── physics ────────────────────────────────────────────────────────────────
+// ─── Update ───────────────────────────────────────────────────────────────────
 function update(dt) {
-  if (countdownActive) return;
+  if (paused) return;
 
-  const W = canvas.width, H = canvas.height;
-  const p = paddles[activePlayer];
-
-  // paddle movement
-  if (keys['ArrowUp'])    p.y -= dp(MOVE_SPEED) * dt;
-  if (keys['ArrowDown'])  p.y += dp(MOVE_SPEED) * dt;
-  if (keys['ArrowLeft'])  p.angle -= ROT_SPEED * Math.PI / 180 * dt;
-  if (keys['ArrowRight']) p.angle += ROT_SPEED * Math.PI / 180 * dt;
-
-  // clamp paddles inside screen
-  paddles.forEach(pad => {
-    const hw = dp(AVT_WIDTH / 2), ht = dp(AVT_THICK / 2);
-    const r = Math.sqrt(hw * hw + ht * ht);
-    pad.x = Math.max(r, Math.min(W - r, pad.x));
-    pad.y = Math.max(r, Math.min(H - r, pad.y));
-  });
-
-  // gravity
-  ball.vy += dp(G) * dt;
-
-  // ball movement
-  ball.x += ball.vx * dt;
-  ball.y += ball.vy * dt;
-
-  // wall bounce
-  const br = dp(BALL_RAD);
-  if (ball.x - br < 0)  { ball.x = br;    ball.vx =  Math.abs(ball.vx); }
-  if (ball.x + br > W)  { ball.x = W - br; ball.vx = -Math.abs(ball.vx); }
-  if (ball.y - br < 0)  { ball.y = br;    ball.vy =  Math.abs(ball.vy); }
-
-  // paddle collision
-  paddles.forEach(pad => collidePaddleBall(pad));
-
-  // out of bottom
-  if (ball.y - br > H) {
-    startCountdown();
-  }
-}
-
-function collidePaddleBall(pad) {
-  // transform ball into paddle local space
-  const dx = ball.x - pad.x;
-  const dy = ball.y - pad.y;
-  const cos = Math.cos(-pad.angle);
-  const sin = Math.sin(-pad.angle);
-  const lx = cos * dx - sin * dy;
-  const ly = sin * dx + cos * dy;
-
-  const hw = dp(AVT_WIDTH / 2);
-  const ht = dp(AVT_THICK / 2);
-  const br = dp(BALL_RAD);
-
-  // closest point on paddle rect to ball center (local)
-  const cx = Math.max(-hw, Math.min(hw, lx));
-  const cy = Math.max(-ht, Math.min(ht, ly));
-
-  const ddx = lx - cx;
-  const ddy = ly - cy;
-  const dist = Math.sqrt(ddx * ddx + ddy * ddy);
-
-  if (dist < br && dist > 0.001) {
-    // normal in local space
-    const nx = ddx / dist;
-    const ny = ddy / dist;
-
-    // push ball out of paddle (local)
-    const overlap = br - dist;
-    const newLx = lx + nx * overlap;
-    const newLy = ly + ny * overlap;
-
-    // back to world space
-    const cos2 = Math.cos(pad.angle);
-    const sin2 = Math.sin(pad.angle);
-    ball.x = pad.x + cos2 * newLx - sin2 * newLy;
-    ball.y = pad.y + sin2 * newLx + cos2 * newLy;
-
-    // reflect velocity
-    const vLx = Math.cos(-pad.angle) * ball.vx - Math.sin(-pad.angle) * ball.vy;
-    const vLy = Math.sin(-pad.angle) * ball.vx + Math.cos(-pad.angle) * ball.vy;
-    const dot = vLx * nx + vLy * ny;
-    const rVLx = vLx - 2 * dot * nx;
-    const rVLy = vLy - 2 * dot * ny;
-    ball.vx = Math.cos(pad.angle) * rVLx - Math.sin(pad.angle) * rVLy;
-    ball.vy = Math.sin(pad.angle) * rVLx + Math.cos(pad.angle) * rVLy;
-  }
-}
-
-// ── countdown & reset ─────────────────────────────────────────────────────
-function startCountdown() {
-  countdownActive = true;
-  countdownVal = 3;
-  overlaySub.textContent = 'ball out of bounds';
-  overlayText.textContent = countdownVal;
-  overlay.classList.add('visible');
-
-  const tick = () => {
-    countdownVal--;
-    if (countdownVal <= 0) {
+  if (inCountdown) {
+    countdownTimer -= dt;
+    if (countdownTimer <= 0) {
       initGame();
-    } else {
-      overlayText.textContent = countdownVal;
-      setTimeout(tick, 900);
     }
-  };
-  setTimeout(tick, 900);
-}
-
-// ── drawing ────────────────────────────────────────────────────────────────
-function drawPaddle(pad) {
-  ctx.save();
-  ctx.translate(pad.x, pad.y);
-  ctx.rotate(pad.angle);
-
-  const hw = dp(AVT_WIDTH / 2);
-  const ht = dp(AVT_THICK / 2);
-
-  if (pad.active) {
-    // glow
-    ctx.shadowColor = 'rgba(232,132,90,0.5)';
-    ctx.shadowBlur = dp(6);
-    ctx.fillStyle = '#e8845a';
-  } else {
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#585450';
+    return;
   }
 
-  ctx.fillRect(-hw, -ht, dp(AVT_WIDTH), dp(AVT_THICK));
+  // Paddle movement
+  const p = paddles[activePaddle];
+  const ms = dp(MOVE_SPEED) * dt;
+  const rs = ROT_SPEED * dt;
+  if (keys['ArrowUp'])    p.y -= ms;
+  if (keys['ArrowDown'])  p.y += ms;
+  if (keys['ArrowLeft'])  { if (!keys['Control']) p.x -= ms; else p.angle -= rs; }
+  if (keys['ArrowRight']) { if (!keys['Control']) p.x += ms; else p.angle += rs; }
 
-  // end caps
-  ctx.beginPath();
-  ctx.arc(-hw, 0, ht, 0, Math.PI * 2);
-  ctx.arc( hw, 0, ht, 0, Math.PI * 2);
-  ctx.fill();
+  // Clamp paddle center within screen
+  const hw = dp(AVT_WIDTH) / 2;
+  const ht = dp(AVT_THICK) / 2;
+  const pad = Math.max(hw, ht);
+  p.x = Math.max(pad, Math.min(W - pad, p.x));
+  p.y = Math.max(pad, Math.min(H - pad, p.y));
 
-  // center dot
-  ctx.beginPath();
-  ctx.arc(0, 0, dp(0.8), 0, Math.PI * 2);
-  ctx.fillStyle = pad.active ? 'rgba(255,220,200,0.6)' : 'rgba(120,115,110,0.4)';
-  ctx.shadowBlur = 0;
-  ctx.fill();
+  // Ball physics
+  ball.vy += dp(G) * dt;  // gravity
+  ball.x  += ball.vx * dt;
+  ball.y  += ball.vy * dt;
 
-  ctx.restore();
+  // Wall bounces
+  const r = dp(BALL_RAD);
+  if (ball.x - r < 0) { ball.x = r; ball.vx = Math.abs(ball.vx); }
+  if (ball.x + r > W) { ball.x = W - r; ball.vx = -Math.abs(ball.vx); }
+  if (ball.y - r < 0) { ball.y = r; ball.vy = Math.abs(ball.vy); }
+
+  // Ball out of bottom → countdown
+  if (ball.y - r > H) {
+    inCountdown = true;
+    countdownTimer = COUNTDOWN;
+    return;
+  }
+
+  // Paddle collisions
+  for (const paddle of paddles) {
+    if (collideBallPaddle(ball, paddle)) bounces++;
+  }
+
+  // Update HUD
+  document.getElementById('info-vx').textContent = (ball.vx / DPX).toFixed(1);
+  document.getElementById('info-vy').textContent = (ball.vy / DPX).toFixed(1);
+  document.getElementById('info-bx').textContent = (ball.x  / DPX).toFixed(1);
+  document.getElementById('info-by').textContent = (ball.y  / DPX).toFixed(1);
+  document.getElementById('info-b' ).textContent = bounces;
 }
 
-function drawBall() {
-  const br = dp(BALL_RAD);
-  // shadow
-  ctx.beginPath();
-  ctx.arc(ball.x + dp(1), ball.y + dp(1), br, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fill();
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
 
-  // ball
-  const grad = ctx.createRadialGradient(
-    ball.x - br * 0.3, ball.y - br * 0.3, br * 0.1,
-    ball.x, ball.y, br
-  );
-  grad.addColorStop(0, '#f0ece4');
-  grad.addColorStop(0.5, '#b8b4ac');
-  grad.addColorStop(1, '#787470');
-
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, br, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
-  ctx.fill();
-}
-
-function drawBackground() {
-  const W = canvas.width, H = canvas.height;
-  ctx.fillStyle = '#201e1c';
-  ctx.fillRect(0, 0, W, H);
-
-  // subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  // Background grid (subtle)
+  ctx.strokeStyle = 'rgba(57,255,20,0.03)';
   ctx.lineWidth = 0.5;
-  const gs = dp(20);
-  for (let x = 0; x < W; x += gs) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (let y = 0; y < H; y += gs) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
+  const grid = dp(50);
+  for (let x = 0; x < W; x += grid) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += grid) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-  // corner marks
-  const m = dp(8);
-  ctx.strokeStyle = 'rgba(232,132,90,0.25)';
-  ctx.lineWidth = 1;
-  [[0,0,1,1],[W,0,-1,1],[0,H,1,-1],[W,H,-1,-1]].forEach(([cx,cy,sx,sy]) => {
-    ctx.beginPath(); ctx.moveTo(cx + sx*m, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy*m); ctx.stroke();
+  // Draw paddles
+  paddles.forEach((p, i) => {
+    const corners = paddleCorners(p);
+    const isActive = (i === activePaddle);
+    const a = p.angle * Math.PI / 180;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const hw = dp(AVT_WIDTH) / 2;
+    const ht = dp(AVT_THICK) / 2;
+
+    // Two halves: "top face" (local y < 0) and "bottom face" (local y > 0)
+    // Top face corners (local-y = -ht)
+    const c0 = corners[3]; // lx= hw, ly=-ht
+    const c1 = corners[2]; // lx=-hw, ly=-ht
+    const c2 = corners[1]; // lx=-hw, ly= ht
+    const c3 = corners[0]; // lx= hw, ly= ht
+
+    // Face 1 (the "top" long face)
+    ctx.beginPath();
+    ctx.moveTo(c0.x, c0.y);
+    ctx.lineTo(c1.x, c1.y);
+    ctx.lineTo(p.x - (p.x-c1.x)*0 + 0, p.y);  // midline
+    ctx.closePath();
+
+    // Draw as two triangular halves split along midline
+    // Actually draw the full rect in 2 half-strips
+    const mx0 = (c0.x + c3.x) / 2; // midpoint right edge
+    const my0 = (c0.y + c3.y) / 2;
+    const mx1 = (c1.x + c2.x) / 2; // midpoint left edge
+    const my1 = (c1.y + c2.y) / 2;
+
+    // Face "A" (local y negative side = top face)
+    ctx.beginPath();
+    ctx.moveTo(c0.x, c0.y); ctx.lineTo(c1.x, c1.y);
+    ctx.lineTo(mx1, my1);   ctx.lineTo(mx0, my0);
+    ctx.closePath();
+    const colA = isActive ? p.color1 : dimColor(p.color1, 0.5);
+    ctx.fillStyle = colA;
+    ctx.fill();
+
+    // Face "B" (local y positive side = bottom face)
+    ctx.beginPath();
+    ctx.moveTo(mx0, my0); ctx.lineTo(mx1, my1);
+    ctx.lineTo(c2.x, c2.y); ctx.lineTo(c3.x, c3.y);
+    ctx.closePath();
+    const colB = isActive ? p.color2 : dimColor(p.color2, 0.5);
+    ctx.fillStyle = colB;
+    ctx.fill();
+
+    // Border
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    corners.slice(1).forEach(c => ctx.lineTo(c.x, c.y));
+    ctx.closePath();
+    ctx.strokeStyle = isActive ? (i === 0 ? 'rgba(57,255,20,0.9)' : 'rgba(255,107,0,0.9)') : 'rgba(100,100,100,0.4)';
+    ctx.lineWidth = isActive ? 1.5 : 0.5;
+    ctx.stroke();
+
+    // Midline stripe
+    ctx.beginPath();
+    ctx.moveTo(mx0, my0); ctx.lineTo(mx1, my1);
+    ctx.strokeStyle = isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Active glow
+    if (isActive) {
+      ctx.shadowColor   = i === 0 ? '#39ff14' : '#ff6b00';
+      ctx.shadowBlur    = 12;
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      corners.slice(1).forEach(c => ctx.lineTo(c.x, c.y));
+      ctx.closePath();
+      ctx.strokeStyle = i === 0 ? 'rgba(57,255,20,0.3)' : 'rgba(255,107,0,0.3)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Label
+    ctx.fillStyle   = isActive ? (i === 0 ? '#39ff14' : '#ff6b00') : '#444';
+    ctx.font        = `${dp(8)}px Orbitron, monospace`;
+    ctx.textAlign   = 'center';
+    ctx.fillText(p.name, p.x, p.y - dp(AVT_WIDTH / 2 + 6));
   });
 
-  // bottom danger zone
-  const dh = dp(4);
-  const dangerGrad = ctx.createLinearGradient(0, H - dh, 0, H);
-  dangerGrad.addColorStop(0, 'rgba(200,80,40,0)');
-  dangerGrad.addColorStop(1, 'rgba(200,80,40,0.15)');
-  ctx.fillStyle = dangerGrad;
-  ctx.fillRect(0, H - dh, W, dh);
+  // Draw ball
+  const r = dp(BALL_RAD);
+  const bx = ball.x, by = ball.y;
+
+  // Glow
+  const grd = ctx.createRadialGradient(bx, by, 0, bx, by, r * 2.5);
+  grd.addColorStop(0,   'rgba(245,196,0,0.6)');
+  grd.addColorStop(0.4, 'rgba(245,196,0,0.15)');
+  grd.addColorStop(1,   'transparent');
+  ctx.beginPath(); ctx.arc(bx, by, r * 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = grd; ctx.fill();
+
+  // Ball body
+  const ballGrd = ctx.createRadialGradient(bx - r*0.3, by - r*0.3, r*0.1, bx, by, r);
+  ballGrd.addColorStop(0,   '#fff8c0');
+  ballGrd.addColorStop(0.4, '#f5c400');
+  ballGrd.addColorStop(1,   '#a07000');
+  ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2);
+  ctx.fillStyle = ballGrd;
+  ctx.shadowColor = '#f5c400'; ctx.shadowBlur = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Countdown overlay
+  if (inCountdown) {
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#f5c400';
+    ctx.font = `bold ${dp(60)}px Orbitron, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil(countdownTimer), W / 2, H / 2 - dp(10));
+    ctx.font = `${dp(12)}px Share Tech Mono, monospace`;
+    ctx.fillStyle = '#888';
+    ctx.fillText('BALL OUT — RESETTING', W / 2, H / 2 + dp(30));
+  }
+
+  // Pause overlay
+  if (paused) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#39ff14';
+    ctx.font = `bold ${dp(20)}px Orbitron, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W / 2, H / 2);
+  }
 }
 
-// ── loop ───────────────────────────────────────────────────────────────────
+function dimColor(hex, factor) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.round(r*factor)},${Math.round(g*factor)},${Math.round(b*factor)})`;
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
 function loop(ts) {
-  if (!lastTime) lastTime = ts;
   const dt = Math.min((ts - lastTime) / 1000, 0.05);
   lastTime = ts;
-
   update(dt);
-
-  drawBackground();
-  paddles.forEach(drawPaddle);
-  drawBall();
-
-  requestAnimationFrame(loop);
+  draw();
+  animId = requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', resize);
-resize();
-updateStatusUI();
-requestAnimationFrame(loop);
+// ─── Input ────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    activePaddle = 1 - activePaddle;
+    updateActiveDisplay();
+  }
+});
+document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+function updateActiveDisplay() {
+  const el = document.getElementById('active-disp');
+  if (activePaddle === 0) {
+    el.textContent = 'P1 ACTIVE';
+    el.className   = 'active-indicator p1-active';
+  } else {
+    el.textContent = 'P2 ACTIVE';
+    el.className   = 'active-indicator p2-active';
+  }
+}
+
+// ─── UI Controls ─────────────────────────────────────────────────────────────
+document.getElementById('btn-restart').addEventListener('click', () => {
+  initGame();
+  if (paused) { paused = false; document.getElementById('btn-pause').textContent = '⏸ PAUSE'; }
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? '▶ RESUME' : '⏸ PAUSE';
+});
+
+function setupSlider(sliderId, valId, varSetter, parse) {
+  const slider = document.getElementById(sliderId);
+  const valEl  = document.getElementById(valId);
+  slider.addEventListener('input', () => {
+    const v = parse(slider.value);
+    valEl.textContent = v;
+    varSetter(v);
+  });
+}
+
+setupSlider('g-slider',     'g-val',     v => { G = v; },          parseFloat);
+setupSlider('speed-slider', 'speed-val', v => { INIT_SPEED = v; }, parseFloat);
+setupSlider('angle-slider', 'angle-val', v => { INIT_ANGLE = v; }, parseFloat);
+
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  canvas = document.getElementById('gameCanvas');
+  ctx    = canvas.getContext('2d');
+
+  resize();
+  window.addEventListener('resize', () => { resize(); initGame(); });
+
+  initGame();
+
+  lastTime = performance.now();
+  animId   = requestAnimationFrame(loop);
+});
 </script>
 </body>
 </html>
