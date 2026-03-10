@@ -16,9 +16,9 @@ ball is affected by gravity. when a ball is hitting a paddle it is bounces back 
 game world:
 a single screen is the entire world of the game. camera is static, nothing exists outside of the screen. 
 contorl:
-each paddle can move around the 2 d space using the arrows keys. it can rotate in either direction with the ctrl + left/right keys. when rotatoin takes palce, the paddle is static in position. 
+each paddle can move around the 2 d space using the arrows keys. it can rotate in either direction with the Q and W keys. 
 2 paddles are controlled by the same keys - at any given time there is one active player. the active player can be switched using the TAB key. 
-physics: gravity is G= 15 d-pixels / second square 
+physics: gravity is G= 46 d-pixels / second square 
 
 
 UI 
@@ -28,6 +28,6 @@ color scheme:
 dominant darkj gray gray, with some green, yellow and orange. each paddle has 2 tones, one for each of it's long side face, or any other way to help visualy distinguish between 2 long face of the paddle
 
 game play:
-the game begind with the ball shot from the bottom left corner in INIT_BALL_ANGL = 45 and at speed INIT_BALL_SPEED = 150 d-pixel / sec. 
+the game begind with the ball shot from the bottom left corner in INIT_BALL_ANGL = 37 and at speed INIT_BALL_SPEED = 220 d-pixel / sec. 
 both paddles are rotated vertically (as per bigger dimensoin), at the vetical center of the screen, close to either horizontal side of it, respectively. 
 each time the ball goes out of the screen bounderies there is a short countdown and the game is reset as per above
