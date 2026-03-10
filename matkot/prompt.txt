@@ -30,4 +30,4 @@ dominant darkj gray gray, with some green, yellow and orange. each paddle has 2 
 game play:
 the game begind with the ball shot from the bottom left corner in INIT_BALL_ANGL = 37 and at speed INIT_BALL_SPEED = 220 d-pixel / sec. 
 both paddles are rotated vertically (as per bigger dimensoin), at the vetical center of the screen, close to either horizontal side of it, respectively. 
-each time the ball goes out of the screen bounderies there is a short countdown and the game is reset as per above
+each time the ball goes out of the screen bounds (that is, hitting top, bottom, left or right limits - there are no wall or cieling around) there is a short countdown and the game is reset as per above
