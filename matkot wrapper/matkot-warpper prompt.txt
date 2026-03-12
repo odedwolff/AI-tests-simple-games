@@ -1,0 +1,36 @@
+
+please create following simple html game:
+
+overview:
+a simple 2d game. 
+
+definitions:
+d-pixel: D_PIXEL_SIZE = 1/1000 of the whole screen width
+game objects:
+ ** 2 paddles moving in a d2 space:
+each paddle is a rectangle of width AVT_WIDTH = 75 d-pixel and thickness of AVT_THICK = 10 d-pixel. at any given time, the active paddle is brighter to indicate that. 
+paddles are not affected by gravity. 
+each paddle has between 0 and 4 wraps around them - layers of "padding" .these are fine lined rectangle sourounding the peddles inner solid rectangle. for reference, it reminds of a countour topographic map. they are separated by a small amoung of pixels. the initial number of wrapps around each rectangle is 2. user can add or remove layers to the active player with the A and S keys - within the range defined here. at this point the wrappers have no functional role and they are not interefering with any physics calculations. 
+
+ ** 1 small ball with radius BALL_RAD = 5 d-pixel. 
+ball is affected by gravity. when a ball is hitting a paddle it is bounces back according to normal physics, without losing any kinetic energy
+
+game world:
+a single screen is the entire world of the game. camera is static, nothing exists outside of the screen. 
+contorl:
+each paddle can move around the 2 d space using the arrows keys. it can rotate in either direction with the Q and W keys. 
+2 paddles are controlled by the same keys - at any given time there is one active player. the active player can be switched using the TAB key. 
+physics: gravity is G= 123 d-pixels / second square 
+
+
+UI 
+the game panel is at the center of the screen. there is a 150 d-pixel whide margin on either side, and 10 d-pixel size margin above and bellow the game panel. on the left panel there is a devloper panel. it contains controls for the following constants: G, INIT_SPEED, INIT_BALL_ANGL, BALL_RAD. make sure these controls are not maintaining focus after setting a value, to prevent the values changed accidently while playing game.  
+on the right panel there are control buttons like restart and pause 
+
+color scheme:
+dominant darkj gray gray, with some green, yellow and orange. each paddle has 2 tones, one for each of it's long side face, or any other way to help visualy distinguish between 2 long face of the paddle
+
+game play:
+the game begind with the ball shot from the bottom left corner in INIT_BALL_ANGL = 49 and at speed INIT_BALL_SPEED = 400 d-pixel / sec. 
+both paddles are rotated vertically (as per bigger dimensoin), at the vetical center of the screen, close to either horizontal side of it, respectively. 
+each time the ball goes out of the screen bounds (that is, hitting top, bottom, left or right limits - there are no wall or cieling around) there is a short countdown and the game is reset as per above
