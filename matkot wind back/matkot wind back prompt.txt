@@ -1,0 +1,60 @@
+
+please create following simple html game:
+
+§1.1 OVERVIEW:
+a simple 2d game. 
+
+§1.2 DEFINITION:
+d-pixel: D_PIXEL_SIZE = 1/1000 of the whole screen width
+
+§1.3
+GAME WORLD:
+a single screen is the entire world of the game. camera is static, nothing exists outside of the screen. 
+
+§1.3.1 physics:
+gravity is G= 123 d-pixels/second square
+
+
+§1.4 GAME OBJECTS:
+§1.4.1 two peddles 
+ 2 paddles moving in a 2D space:
+each paddle is a rectangle of length AVT_LENGTH = 75 d-pixel and thickness of AVT_THICK = 10 d-pixel. at any given time, the active paddle is brighter to indicate that. 
+each paddle has a front and a back. the front is one of the rectenagle's long edges, and the back is the edge against it. 
+each paddle has a small bump stikcing out of the the middel of its back. it is about 5 d-pixel deep.
+
+§1.4.1.1 contorl:
+each paddle can move around the 2D space using the arrows keys. it can rotate in either direction with the Q and W keys. 
+2 paddles are controlled by the same keys - at any given time there is one active paddle. the active paddle can be switched using the TAB key.
+§1.4.1.2 load back and release:
+when pressing SPACE KEY	the back loading begins: the active peddle withdraws back, perpendicular to its long axis, in the direction the peddele's back is directed.  
+when releasing SPACE KEY, the withdrown peddle moves back to is pre load position. load back speed is LOADBACK_SPD = 60 d-pixel/sec, max load back range is LOADBACK_RANGE=75 d-pixel, relase speed is MAX_REL_SPPED = 250 d-pixel/sec if the full backload range was reached, or proportionally slower of less was reached
+
+§1.4.1.2 physics:
+paddles are not affected by gravity. 
+
+
+§1.4.2 the ball 
+1 small ball with radius BALL_RAD = 5 d-pixel. 
+the ball is affected by gravity. when a ball is hitting a paddle it is bounces back according to normal physics, considering it also the energy that the peddle might bring into the collision  
+
+ 
+
+
+§1.5
+UI 
+the game panel is at the center of the screen. there is a thin green frame to border it from all directions. there is a 150 d-pixel whide margin on either side, and 10 d-pixel size margin above and bellow the game panel. on the left panel there is a devloper panel. it contains controls for the following constants: G, INIT_SPEED, INIT_BALL_ANGL, BALL_RAD. make sure these controls are not maintaining focus after setting a value, to prevent the values changed accidently while playing game.  
+on the right panel there are control buttons like restart and pause 
+
+color scheme:
+dominant dark - gray, with some green, yellow and orange. each paddle has 2 tones, one for each of it's long side face, or any other way to help visualy distinguish between 2 long face of the paddle
+
+§1.6
+GAME PLAY:
+§1.6.1 
+start:
+the 2 paddles are on both sides of the game panel, facing each other, their backs to the left and rigtht frame walls respectevely. 
+each paddle's long axis (the 75 d-px AVT_WIDTH dimension) is aligned with the Y-axis, i.e. pointing top-to-bottom. The short axis (AVT_THICK = 10 d-px) is horizontal.
+the ball shot from the bottom left corner of the game panel in INIT_BALL_ANGL = 49 and at speed INIT_BALL_SPEED = 400 d-pixel / sec. 
+§1.6.2 
+restart conditions:
+each time the ball goes out of the screen bounds (that is, hitting top, bottom, left or right limits - there are no wall or cieling around) there is a short countdown and the game restarts as per above

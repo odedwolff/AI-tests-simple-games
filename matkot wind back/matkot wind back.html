@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PADDLE DUEL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+  :root {
+    --bg:#0d0f0d; --panel:#111411; --game-bg:#080a08;
+    --green:#39ff14; --gdim:#1a7a08; --gdark:#0d3a06;
+    --yellow:#f0c040; --orange:#e07820;
+    --gray-l:#8a9a8a; --gray-m:#4a5a4a; --gray-d:#1e211e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--gray-l);
+    display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;}
+  #root{display:flex;align-items:stretch;width:100vw;height:100vh;}
+  .side-panel{width:150px;min-width:150px;background:var(--panel);display:flex;
+    flex-direction:column;padding:10px 8px;gap:12px;overflow-y:auto;}
+  #lp{border-right:1px solid var(--gdark);}
+  #rp{border-left:1px solid var(--gdark);}
+  .ph{font-family:'Orbitron',monospace;font-size:9px;color:var(--green);letter-spacing:2px;
+    text-transform:uppercase;border-bottom:1px solid var(--gdark);padding-bottom:5px;text-align:center;}
+  .dc{display:flex;flex-direction:column;gap:3px;}
+  .dc label{font-size:9px;color:var(--gray-l);letter-spacing:1px;}
+  .dc input{background:var(--gray-d);border:1px solid var(--gray-m);color:var(--yellow);
+    font-family:'Share Tech Mono',monospace;font-size:11px;padding:3px 5px;width:100%;outline:none;}
+  .dc input:focus{border-color:var(--green);}
+  .cb{background:var(--gray-d);border:1px solid var(--gray-m);color:#c8d8c8;
+    font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;padding:8px 4px;
+    cursor:pointer;transition:all .15s;text-align:center;width:100%;}
+  .cb:hover{border-color:var(--green);color:var(--green);}
+  .cb.act{border-color:var(--orange);color:var(--orange);}
+  .sb{display:flex;flex-direction:column;gap:5px;font-size:10px;}
+  .sr{display:flex;justify-content:space-between;}
+  .sv{color:var(--yellow);}
+  .ai{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;}
+  .iao{background:var(--orange);box-shadow:0 0 5px var(--orange);}
+  .iag{background:var(--green);box-shadow:0 0 5px var(--green);}
+  .kh{font-size:8px;color:var(--gray-m);border-top:1px solid var(--gdark);padding-top:6px;line-height:1.8;}
+  .kh span{color:var(--gray-l);}
+  #center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 0;}
+  #cw{position:relative;border:2px solid var(--green);
+    box-shadow:0 0 20px rgba(57,255,20,.18),inset 0 0 10px rgba(0,0,0,.5);}
+  canvas{display:block;}
+  #ov{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;pointer-events:none;}
+  #om{font-family:'Orbitron',monospace;font-size:24px;font-weight:900;color:var(--green);
+    text-shadow:0 0 20px var(--green);letter-spacing:4px;display:none;}
+  #os{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--yellow);
+    margin-top:10px;letter-spacing:2px;display:none;}
+</style>
+</head>
+<body>
+<div id="root">
+
+<div class="side-panel" id="lp">
+  <div class="ph">DEV CTRL</div>
+  <div class="dc"><label>G (dp/s²)</label><input type="number" id="cG" value="123" step="1" min="0"></div>
+  <div class="dc"><label>INIT SPEED</label><input type="number" id="cS" value="400" step="10" min="10"></div>
+  <div class="dc"><label>BALL ANGLE°</label><input type="number" id="cA" value="49" step="1" min="1" max="89"></div>
+  <div class="dc"><label>BALL RADIUS</label><input type="number" id="cR" value="5" step="1" min="1" max="40"></div>
+</div>
+
+<div id="center">
+  <div id="cw">
+    <canvas id="gc"></canvas>
+    <div id="ov"><div id="om"></div><div id="os"></div></div>
+  </div>
+</div>
+
+<div class="side-panel" id="rp">
+  <div class="ph">CONTROLS</div>
+  <button class="cb" id="bRe">RESTART</button>
+  <button class="cb" id="bPa">PAUSE</button>
+  <div class="sb">
+    <div class="sr"><span>ACTIVE</span></div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <span class="ai iao" id="aind"></span>
+      <span id="albl" style="color:var(--orange);font-size:10px">PADDLE A</span>
+    </div>
+    <div class="sr"><span>PAUSED</span><span class="sv" id="pvl">NO</span></div>
+    <div class="sr"><span>LOAD</span><span class="sv" id="pld">0%</span></div>
+  </div>
+  <div class="kh">
+    <span>ARROWS</span> move<br>
+    <span>Q / W</span> rotate<br>
+    <span>SPACE</span> load/fire<br>
+    <span>TAB</span> switch<br>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ── CONSTANTS (all in d-pixels or d-px/s) ────────────────────────────────────
+const C = {
+  AVT_LENGTH:75, AVT_THICK:10, BUMP_DEPTH:5, BUMP_WIDTH:14,
+  LOADBACK_SPD:60, LOADBACK_RANGE:75, MAX_REL_SPD:250,
+  MOVE_SPD:200, ROT_SPD:2.2,
+};
+
+let CFG = { G:123, INIT_SPEED:400, INIT_ANGLE:49, BALL_RAD:5 };
+
+// ── CANVAS ────────────────────────────────────────────────────────────────────
+const cv  = document.getElementById('gc');
+const ctx = cv.getContext('2d');
+const cw  = document.getElementById('cw');
+let GW, GH;
+
+function resize() {
+  GW = window.innerWidth  - 300;  // 150 each side
+  GH = window.innerHeight - 20;   // 10 top + 10 bottom
+  cv.width = GW; cv.height = GH;
+  cw.style.width = GW+'px'; cw.style.height = GH+'px';
+}
+resize();
+
+// d-pixel utilities: 1 dp = GW/1000 real px
+function px(dp) { return dp * GW / 1000; }
+function dp(p)  { return p * 1000 / GW; }
+
+// ── STATE (positions in dp) ───────────────────────────────────────────────────
+// Coordinate convention:
+//   angle θ: LOCAL_X = (cosθ, sinθ) along paddle LENGTH
+//             LOCAL_Y = (−sinθ, cosθ) perpendicular; +LOCAL_Y = FRONT face
+// angle = −π/2: LOCAL_X=(0,−1), LOCAL_Y=(1,0)  → FRONT points RIGHT  ← Paddle A
+// angle =  π/2: LOCAL_X=(0,1),  LOCAL_Y=(−1,0) → FRONT points LEFT   ← Paddle B
+
+let paddles, ball, activeIdx, paused, gameRunning, cdTimer, cdVal;
+
+function mkPad(id, xdp, ydp, angle) {
+  return { id, x:xdp, y:ydp, angle,
+           loadback:0, loading:false, releaseVel:0, active:false,
+           baseX:xdp, baseY:ydp };
+}
+
+function initGame() {
+  const ghDP = dp(GH);
+  const ht   = C.AVT_THICK / 2;
+
+  const pA = mkPad('A', ht, ghDP/2, -Math.PI/2);
+  pA.active = true;
+  const pB = mkPad('B', 1000 - ht, ghDP/2, Math.PI/2);
+
+  paddles = [pA, pB];
+  activeIdx = 0;
+  updateUI();
+
+  const rad = CFG.INIT_ANGLE * Math.PI / 180;
+  ball = {
+    x: 10, y: ghDP - 10,
+    vx: CFG.INIT_SPEED * Math.cos(rad),
+    vy: -CFG.INIT_SPEED * Math.sin(rad),
+    trail: [],
+  };
+
+  paused = false; gameRunning = true;
+  clearInterval(cdTimer);
+  hideOv(); updatePauseBtn();
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+const K = {};
+document.addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Tab') { e.preventDefault(); switchPad(); return; }
+  K[e.code] = true;
+});
+document.addEventListener('keyup', e => { K[e.code] = false; });
+
+function switchPad() {
+  paddles[activeIdx].active = false;
+  activeIdx = 1 - activeIdx;
+  paddles[activeIdx].active = true;
+  updateUI();
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
+document.getElementById('bRe').onclick = () => { clearInterval(cdTimer); initGame(); };
+document.getElementById('bPa').onclick = togglePause;
+
+function togglePause() {
+  paused = !paused;
+  updatePauseBtn();
+  if (paused) showOv('PAUSED',''); else hideOv();
+}
+function updatePauseBtn() {
+  const b = document.getElementById('bPa');
+  document.getElementById('pvl').textContent = paused?'YES':'NO';
+  b.textContent = paused?'RESUME':'PAUSE';
+  b.classList.toggle('act', paused);
+}
+function updateUI() {
+  const lbl=document.getElementById('albl'), ind=document.getElementById('aind');
+  const isA = activeIdx===0;
+  lbl.textContent = isA?'PADDLE A':'PADDLE B';
+  lbl.style.color = isA?'var(--orange)':'var(--green)';
+  ind.className   = 'ai '+(isA?'iao':'iag');
+}
+function showOv(m,s) {
+  const om=document.getElementById('om'),os=document.getElementById('os');
+  om.textContent=m; om.style.display='block';
+  os.textContent=s; os.style.display=s?'block':'none';
+}
+function hideOv() {
+  document.getElementById('om').style.display='none';
+  document.getElementById('os').style.display='none';
+}
+
+// Dev controls – blur immediately after apply to prevent arrow-key hijack
+['cG','cS','cA','cR'].forEach(id => {
+  const el=document.getElementById(id);
+  const apply=() => {
+    CFG.G=+document.getElementById('cG').value||123;
+    CFG.INIT_SPEED=+document.getElementById('cS').value||400;
+    CFG.INIT_ANGLE=+document.getElementById('cA').value||49;
+    CFG.BALL_RAD=+document.getElementById('cR').value||5;
+    el.blur();
+  };
+  el.addEventListener('change', apply);
+  el.addEventListener('keydown', e => { if(e.key==='Enter') apply(); });
+});
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+let lastT=null;
+function loop(ts) {
+  requestAnimationFrame(loop);
+  if (!lastT) { lastT=ts; return; }
+  const dt = Math.min((ts-lastT)/1000, 0.05);
+  lastT = ts;
+  if (!paused && gameRunning) update(dt);
+  render();
+}
+requestAnimationFrame(loop);
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  const p = paddles[activeIdx];
+  const ghDP = dp(GH);
+  const spd  = C.MOVE_SPD;
+
+  if (K['ArrowUp'])    p.y -= spd * dt;
+  if (K['ArrowDown'])  p.y += spd * dt;
+  if (K['ArrowLeft'])  p.x -= spd * dt;
+  if (K['ArrowRight']) p.x += spd * dt;
+  if (K['KeyQ'])       p.angle -= C.ROT_SPD * dt;
+  if (K['KeyW'])       p.angle += C.ROT_SPD * dt;
+
+  // Clamp paddle center so it stays in world
+  const margin = Math.max(C.AVT_LENGTH/2, C.AVT_THICK/2) + 2;
+  p.x = clamp(p.x, margin, 1000 - margin);
+  p.y = clamp(p.y, margin, ghDP  - margin);
+
+  // Load/release
+  if (!p.loading && K['Space']) {
+    p.loading=true; p.baseX=p.x; p.baseY=p.y;
+    p.loadback=0; p.releaseVel=0;
+  }
+  if (p.loading) {
+    if (K['Space']) {
+      // Withdraw in BACK direction (−LOCAL_Y)
+      const bx =  Math.sin(p.angle);
+      const by = -Math.cos(p.angle);
+      const maxLB = C.LOADBACK_RANGE;
+      if (p.loadback < maxLB) {
+        const step = Math.min(C.LOADBACK_SPD * dt, maxLB - p.loadback);
+        p.x += bx*step; p.y += by*step; p.loadback += step;
+      }
+    } else {
+      // Release: spring to base
+      if (p.loadback > 0.3) {
+        const ratio = p.loadback / C.LOADBACK_RANGE;
+        const rspd  = C.MAX_REL_SPD * ratio;
+        // Move in FRONT direction (+LOCAL_Y)
+        const fx = -Math.sin(p.angle);
+        const fy =  Math.cos(p.angle);
+        const step = Math.min(rspd * dt * 6, p.loadback);
+        p.x += fx*step; p.y += fy*step;
+        p.loadback -= step;
+        p.releaseVel = rspd;
+      } else {
+        p.loadback=0; p.loading=false; p.releaseVel=0;
+      }
+    }
+  } else {
+    p.releaseVel = Math.max(0, p.releaseVel - 600*dt);
+  }
+
+  document.getElementById('pld').textContent =
+    Math.round((paddles[activeIdx].loadback / C.LOADBACK_RANGE)*100)+'%';
+
+  // Ball (dp/s units)
+  ball.trail.push({x:ball.x, y:ball.y});
+  if (ball.trail.length > 14) ball.trail.shift();
+
+  ball.vy += CFG.G * dt;
+  ball.x  += ball.vx * dt;
+  ball.y  += ball.vy * dt;
+
+  for (const pad of paddles) collidePaddle(pad);
+
+  const br  = CFG.BALL_RAD;
+  const ghd = dp(GH);
+  if (ball.x-br<0 || ball.x+br>1000 || ball.y-br<0 || ball.y+br>ghd) {
+    triggerRestart();
+  }
+}
+
+// ── COLLISION ─────────────────────────────────────────────────────────────────
+function collidePaddle(pad) {
+  const dx = ball.x - pad.x;
+  const dy = ball.y - pad.y;
+  // Local space: lx along LOCAL_X (length), ly along LOCAL_Y (thickness/normal)
+  const cosA = Math.cos(pad.angle), sinA = Math.sin(pad.angle);
+  const lx =  dx*cosA + dy*sinA;
+  const ly = -dx*sinA + dy*cosA;
+
+  const hl = C.AVT_LENGTH/2, ht = C.AVT_THICK/2, br = CFG.BALL_RAD;
+
+  if (Math.abs(lx) >= hl+br) return;
+  if (Math.abs(ly) >= ht+br) return;
+
+  const ox = hl+br - Math.abs(lx);
+  const oy = ht+br - Math.abs(ly);
+
+  let nx, ny; // world-space collision normal
+  if (oy <= ox) {
+    // Collide on front/back face
+    const sign = ly>0?1:-1;
+    nx = -sinA*sign; ny = cosA*sign;
+    ball.x += nx*oy; ball.y += ny*oy;
+  } else {
+    // Collide on left/right cap
+    const sign = lx>0?1:-1;
+    nx = cosA*sign; ny = sinA*sign;
+    ball.x += nx*ox; ball.y += ny*ox;
+  }
+
+  const dot = ball.vx*nx + ball.vy*ny;
+  if (dot < 0) {
+    // Add release impulse in FRONT direction (+LOCAL_Y world)
+    const pfx = -sinA * pad.releaseVel * 0.75;
+    const pfy =  cosA * pad.releaseVel * 0.75;
+    ball.vx = ball.vx - 2*dot*nx + pfx;
+    ball.vy = ball.vy - 2*dot*ny + pfy;
+  }
+}
+
+// ── RESTART ───────────────────────────────────────────────────────────────────
+function triggerRestart() {
+  if (!gameRunning) return;
+  gameRunning = false; cdVal = 3;
+  showOv('OUT!', `restarting in ${cdVal}…`);
+  cdTimer = setInterval(() => {
+    cdVal--;
+    if (cdVal<=0) { clearInterval(cdTimer); initGame(); }
+    else showOv('OUT!', `restarting in ${cdVal}…`);
+  }, 1000);
+}
+
+function clamp(v,lo,hi) { return v<lo?lo:v>hi?hi:v; }
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0,0,GW,GH);
+  ctx.fillStyle='#080a08'; ctx.fillRect(0,0,GW,GH);
+
+  // Subtle grid
+  ctx.strokeStyle='rgba(57,255,20,0.04)'; ctx.lineWidth=1;
+  const gs=px(50);
+  for(let x=0;x<GW;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,GH);ctx.stroke();}
+  for(let y=0;y<GH;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(GW,y);ctx.stroke();}
+
+  // Ball trail
+  const br = px(CFG.BALL_RAD);
+  for(let i=0;i<ball.trail.length;i++) {
+    const t=ball.trail[i], frac=i/ball.trail.length;
+    ctx.beginPath();
+    ctx.arc(px(t.x),px(t.y),Math.max(0.5,br*frac*0.85),0,Math.PI*2);
+    ctx.fillStyle=`rgba(240,192,64,${frac*0.35})`; ctx.fill();
+  }
+
+  // Ball
+  ctx.beginPath();
+  ctx.arc(px(ball.x),px(ball.y),br,0,Math.PI*2);
+  ctx.fillStyle='#f0c040';
+  ctx.shadowColor='#f0c040'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0;
+
+  // Paddles
+  paddles.forEach(drawPaddle);
+}
+
+function drawPaddle(p) {
+  const hl=px(C.AVT_LENGTH/2), ht=px(C.AVT_THICK/2);
+  const bd=px(C.BUMP_DEPTH),   bw=px(C.BUMP_WIDTH/2);
+  const isA=p.id==='A', act=p.active;
+
+  const frontCol = isA ? (act?'#e07820':'#8a4010') : (act?'#39ff14':'#1a8a08');
+  const backCol  = isA ? (act?'#6a3000':'#3a1800') : (act?'#0d5a06':'#073504');
+  const edgeCol  = isA ? (act?'#ffa040':'#c06820') : (act?'#80ff50':'#30c020');
+  const glowCol  = isA ? '#e07820' : '#39ff14';
+
+  ctx.save();
+  ctx.translate(px(p.x), px(p.y));
+  ctx.rotate(p.angle);
+
+  // Back bump (sticks out in +LOCAL_Y = back? No: we defined +LOCAL_Y = FRONT)
+  // Back is −LOCAL_Y direction, so bump at ly > +ht (below the rect in local coords)
+  // Wait: in my LOCAL_Y definition, +LOCAL_Y = FRONT. So BACK face is at local_y = +ht.
+  // The bump sticks out from the BACK face, which is at +ht, going further +LOCAL_Y direction.
+  // Actually I need to reconsider visually: in draw, the rect goes from -ht to +ht in local_y.
+  // +LOCAL_Y = FRONT means FRONT face is at ly = -ht (rendered at top of local rect, y-up).
+  // BACK face is at ly = +ht.
+  // Bump sticks out from BACK face: at ly > +ht.
+
+  // Back bump
+  ctx.beginPath();
+  ctx.rect(-bw, ht, bw*2, bd);
+  ctx.fillStyle = isA?'#2a1000':'#031503';
+  ctx.fill();
+  ctx.strokeStyle = isA?'#5a2000':'#0a3206';
+  ctx.lineWidth=1; ctx.stroke();
+
+  // Back face (positive local-y half)
+  ctx.beginPath(); ctx.rect(-hl, 0, hl*2, ht);
+  ctx.fillStyle = backCol; ctx.fill();
+
+  // Front face (negative local-y half) — FRONT
+  ctx.beginPath(); ctx.rect(-hl, -ht, hl*2, ht);
+  ctx.fillStyle = frontCol; ctx.fill();
+
+  // Center seam
+  ctx.beginPath(); ctx.moveTo(-hl,0); ctx.lineTo(hl,0);
+  ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // FRONT edge glow (at -ht)
+  ctx.beginPath(); ctx.moveTo(-hl,-ht); ctx.lineTo(hl,-ht);
+  ctx.strokeStyle=edgeCol; ctx.lineWidth=act?2:1;
+  ctx.shadowColor=edgeCol; ctx.shadowBlur=act?10:0;
+  ctx.stroke(); ctx.shadowBlur=0;
+
+  // Outline
+  ctx.beginPath(); ctx.rect(-hl,-ht,hl*2,ht*2);
+  ctx.strokeStyle = act ? glowCol : (isA?'#4a2000':'#093006');
+  ctx.lineWidth=act?1.5:0.8; ctx.stroke();
+
+  // Active aura
+  if (act) {
+    ctx.beginPath(); ctx.rect(-hl-3,-ht-3,hl*2+6,ht*2+6);
+    ctx.strokeStyle = isA?'rgba(224,120,32,0.22)':'rgba(57,255,20,0.22)';
+    ctx.lineWidth=4; ctx.stroke();
+  }
+
+  // Load indicator bar (behind the back bump)
+  if (p.loadback > 0.3) {
+    const frac = p.loadback / C.LOADBACK_RANGE;
+    const blen  = hl * 1.4 * frac;
+    ctx.beginPath();
+    ctx.rect(-blen/2, ht+bd+px(2), blen, px(3));
+    ctx.fillStyle = frac>0.8?'#ff4040':frac>0.5?'#f0c040':'#39ff14';
+    ctx.fill();
+  }
+
+  // ID
+  ctx.font=`bold ${px(7)}px 'Orbitron',monospace`;
+  ctx.fillStyle=act?'#fff':'#555';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(p.id, 0, 0);
+
+  ctx.restore();
+}
+
+// ── RESIZE ────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  resize();
+  if (!paddles) return;
+  const ghDP = dp(GH);
+  const m = Math.max(C.AVT_LENGTH/2, C.AVT_THICK/2)+2;
+  paddles.forEach(p => {
+    p.x=clamp(p.x,m,1000-m);
+    p.y=clamp(p.y,m,ghDP-m);
+    p.baseX=p.x; p.baseY=p.y;
+  });
+});
+
+// ── START ─────────────────────────────────────────────────────────────────────
+initGame();
+</script>
+</body>
+</html>
