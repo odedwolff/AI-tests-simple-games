@@ -1,0 +1,8 @@
+
+
+feels quite natural, but very difficult to control, and has collision detection issues:
+
+G - 700 
+INIT SPEED - 750 
+BALL ANGLE  - 55 
+JUMP SPEED - 650 

@@ -1,0 +1,71 @@
+
+
+please create following simple html game:
+
+§1.1 OVERVIEW:
+a simple 2d game. inspired by volley ball. player controls 2 players, on the same play field. 
+
+
+§1.2 DEFINITION:
+the left/rigth game fields: the left and right sections, respectively, of the play field, divided by the net. 
+
+
+§1.3
+GAME WORLD:
+a single screen is the entire world of the game. camera is static, nothing exists outside of the screen. there is a floor /ground at the bottom, the other confines (top, left, right) are open. on the ground stands a net. we view it from the side (so the net appears like a piller). the net divides the game panel into left and right. it is distanced NET_DIST_FROM_LEFT_VW = 35 vw from the left end. on the right game field there are 2 clubs. the clubs are controlled by the player. they hover close above the ground, but have the ability to jump. they can hit and manipulate it. 
+
+§1.3.1 physics:
+gravity is G = 50 vh/(second square)
+the net is solid and stiff. 
+the ground is solid and stiff. 
+
+
+§1.4 GAME OBJECTS:
+§1.4.1 two clubs 
+ 2 clubs moving inside the right game field. 
+each club is a rectangle of length AVT_LENGTH = 8 vw and thickness of AVT_THICK = 2 vw. at any given time, the active club is brighter to indicate that. 
+for each club, we will define side1 as one of the long edges of the rectange, and side2 as the edge opposite of it. once assigned, side1/side2 remain fixed for that club - it is defined by local orientation. 
+each club has a bump stikcing out of its side2 of it. it is about 3 vw deep.
+
+§1.4.1.1 contorl:
+each club can move left and right inside the right game field (between the net and the right confine) with arrow keys. it can rotate in either direction with the Q and W keys. 
+it can jump with the up key. the initial jump speed is INIT_JMP_SPEED = 60vh / sec. while on an active jump, left and right user control are disabled, as per normal physics. 
+at rest (that is, anytime they are not on an active jump) the clubs  are hovering at HOVER_DIST = 2 vh above the ground.  
+2 clubs are controlled by the same keys - at any given time there is one active club. the active club can be switched using the TAB key.
+
+§1.4.1.2 load back and release:
+when pressing SPACE KEY	the back loading begins: the active club withdraw, perpendicular to its long axis, in the direction side2 is facing. 
+when releasing SPACE KEY, the withdrown club moves back to is pre load position. load back speed is LOADBACK_SPD = 5 vw/sec, max load back range is LOADBACK_RANGE=5 vw, relase speed is MAX_RLS_SPPED = 20 vw/sec if the full backload range was reached, or proportionally slower of less was reached
+
+§1.4.1.2 physics:
+when clubs hit the ball with their side2 first, they have no influence on the ball and allow the ball the pass through them uninterrupted. when the ball hit their side1 first, they effect the ball as per normal physics - factoring in the movements of the ball and the club. on a hit, the relative speed and angle of the ball to the club is being calculated, but then a KIN_LOSS = 0.15 of the kinetic energy is being lost to friction etc. 
+
+
+§1.4.2 the ball 
+1 small ball with radius BALL_RAD = 5 vw. 
+the ball is affected by gravity
+
+ 
+
+
+§1.5
+UI 
+the game panel is at the center of the screen. there is a thin green frame to border it from all directions. there is a 15 vw wide margin on either side, and 5 vh size margin above and bellow the game panel. on the left panel there is a devloper panel. it contains controls for the following constants:
+    G, NET_DIST_FROM_LEFT_VW, AVT_LENGTH, AVT_THICK, INIT_JMP_SPEED, HOVER_DIST, LOADBACK_SPD, LOADBACK_RANGE, MAX_RLS_SPPED, KIN_LOSS, INIT_BALL_ANGL, INIT_BALL_SPEED,  BALL_RAD
+	
+the name of the parameters is in green and font 12px 	
+make sure these controls are not maintaining focus after setting a value, to prevent the values changed accidently while playing game.  
+on the right panel there are control buttons like restart and pause 
+
+color scheme:
+dominant dark - gray, with some green, yellow and orange. each club has 2 tones, one for each of it's long side face, or any other way to help visualy distinguish between 2 long face of the club
+
+§1.6
+GAME PLAY:
+§1.6.1 
+start:
+the 2 clubs  are on the right game field, their faces pointing left and up diagonally, that is, their pointy back pointing down and right diagaonaly. 
+the ball shot from the bottom left corner of the game panel in INIT_BALL_ANGL = 49 and at speed INIT_BALL_SPEED = 50 vw / sec. 
+§1.6.2 
+restart conditions:
+each time the ball goes out of the screen bounds (that is, hitting top, left or right limits - there are no wall or cieling around) there is a short countdown and the game restarts as per above, including the clubs retruning to their original reset poisition. 
