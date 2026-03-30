@@ -2,1010 +2,928 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VOLLEY-DUEL</title>
+<title>CLUBBALL</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0d0f0e;
-    --panel-bg: #111412;
-    --frame: #2a4a2e;
-    --green: #3ddc6e;
-    --green-dim: #1e6b3a;
-    --yellow: #d4c44a;
-    --orange: #e07a2f;
-    --gray-light: #8a9e8d;
-    --gray-mid: #3a4a3d;
-    --gray-dark: #1a2a1d;
-    --paddle1-front: #e07a2f;
-    --paddle1-back: #7a3a10;
-    --paddle2-front: #d4c44a;
-    --paddle2-back: #6a5a10;
-    --ball: #e0d0b0;
-    --net: #4a7a4e;
-    --font-mono: 'Share Tech Mono', monospace;
-    --font-display: 'Orbitron', sans-serif;
+    --bg: #0d0f0d;
+    --panel-bg: #111411;
+    --border: #1e2a1e;
+    --green: #39ff14;
+    --green-dim: #1a6b08;
+    --yellow: #f5c518;
+    --orange: #ff6b1a;
+    --gray: #2a2e2a;
+    --gray-light: #3d443d;
+    --text: #a8b5a8;
+    --white: #e8f0e8;
   }
 
   body {
     background: var(--bg);
-    color: var(--green);
-    font-family: var(--font-mono);
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text);
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
-    overflow: hidden;
   }
 
   #root {
     display: flex;
-    align-items: center;
-    justify-content: center;
     width: 100vw;
     height: 100vh;
-  }
-
-  #layout {
-    display: flex;
     align-items: center;
-    gap: 0;
+    justify-content: center;
   }
 
-  /* Side panels */
-  .side-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 8px;
-    background: var(--panel-bg);
-    border: 1px solid var(--gray-mid);
-    align-self: stretch;
+  #left-panel {
+    width: 15vw;
+    height: calc(100vh - 10vh);
+    padding: 8px 10px;
+    overflow-y: auto;
+    flex-shrink: 0;
   }
 
-  .side-panel h3 {
-    font-family: var(--font-display);
-    font-size: 9px;
-    letter-spacing: 2px;
+  #left-panel h3 {
+    font-family: 'Orbitron', sans-serif;
     color: var(--green);
-    text-transform: uppercase;
-    margin-bottom: 4px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
     border-bottom: 1px solid var(--green-dim);
     padding-bottom: 4px;
   }
 
-  .dev-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .param-row {
+    margin-bottom: 7px;
   }
 
-  .dev-row label {
-    font-size: 9px;
-    color: var(--gray-light);
-    letter-spacing: 1px;
-  }
-
-  .dev-row input[type=number] {
-    background: var(--gray-dark);
-    border: 1px solid var(--green-dim);
+  .param-label {
     color: var(--green);
-    font-family: var(--font-mono);
     font-size: 10px;
-    padding: 2px 4px;
+    display: block;
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+
+  .param-row input[type="number"] {
     width: 100%;
+    background: var(--gray);
+    border: 1px solid var(--green-dim);
+    color: var(--yellow);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 5px;
     outline: none;
   }
 
-  .dev-row input[type=number]:focus {
+  .param-row input[type="number"]:focus {
     border-color: var(--green);
   }
 
-  .ctrl-btn {
-    background: var(--gray-dark);
-    border: 1px solid var(--green-dim);
-    color: var(--green);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 6px 8px;
-    cursor: pointer;
-    letter-spacing: 1px;
-    transition: all 0.1s;
-    text-transform: uppercase;
-  }
-
-  .ctrl-btn:hover {
-    background: var(--green-dim);
-    border-color: var(--green);
-  }
-
-  .ctrl-btn.pause-active {
-    background: var(--orange);
-    border-color: var(--orange);
-    color: #000;
-  }
-
-  /* Game canvas wrapper */
-  #game-wrap {
+  #game-wrapper {
+    flex: 1;
+    height: calc(100vh - 10vh);
+    margin: 5vh 0;
     position: relative;
+    border: 1.5px solid var(--green-dim);
+    box-shadow: 0 0 18px #39ff1422, inset 0 0 8px #0002;
+    background: #0a0c0a;
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #right-panel {
+    width: 15vw;
+    height: calc(100vh - 10vh);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
     flex-shrink: 0;
   }
 
-  #game-canvas {
-    display: block;
-    border: 2px solid var(--frame);
-    box-shadow: 0 0 20px rgba(61,220,110,0.15), inset 0 0 60px rgba(0,0,0,0.5);
-    image-rendering: pixelated;
-  }
-
-  /* Overlay */
-  #overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.7);
-    font-family: var(--font-display);
-    pointer-events: none;
-  }
-
-  #overlay.hidden { display: none; }
-
-  #overlay .countdown {
-    font-size: 48px;
-    color: var(--yellow);
-    text-shadow: 0 0 20px var(--yellow);
-    animation: pulse 0.4s ease-in-out infinite alternate;
-  }
-
-  #overlay .msg {
-    font-size: 14px;
-    color: var(--gray-light);
-    margin-top: 10px;
-    letter-spacing: 3px;
-  }
-
-  @keyframes pulse {
-    from { transform: scale(1); opacity: 0.8; }
-    to { transform: scale(1.1); opacity: 1; }
-  }
-
-  .score-display {
-    font-family: var(--font-display);
-    font-size: 9px;
-    color: var(--gray-light);
-    text-align: center;
+  #right-panel h3 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--green);
+    font-size: 10px;
     letter-spacing: 2px;
-    margin-top: 4px;
+    border-bottom: 1px solid var(--green-dim);
+    padding-bottom: 4px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 14px;
+    border: 1px solid var(--green-dim);
+    background: var(--gray);
+    color: var(--green);
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: #1a2a1a;
+    border-color: var(--green);
+  }
+
+  .ctrl-btn:active {
+    background: var(--green-dim);
+  }
+
+  #status-box {
+    width: 100%;
+    font-size: 10px;
+    color: var(--orange);
+    text-align: center;
+    min-height: 20px;
+    margin-top: 6px;
+  }
+
+  #title-logo {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-align: center;
+    margin-bottom: 12px;
+    text-shadow: 0 0 8px var(--green);
+  }
+
+  #active-club-display {
+    font-size: 10px;
+    color: var(--yellow);
+    text-align: center;
+    width: 100%;
   }
 
   .key-hint {
-    font-size: 8px;
-    color: var(--gray-mid);
-    line-height: 1.6;
-    margin-top: 6px;
-    border-top: 1px solid var(--gray-mid);
-    padding-top: 6px;
-  }
-
-  .key-hint span {
-    color: var(--yellow);
-  }
-
-  .status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 4px;
     font-size: 9px;
     color: var(--gray-light);
-    margin-top: 4px;
+    text-align: center;
+    line-height: 1.6;
+    margin-top: 6px;
   }
 
-  .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--orange);
-  }
-
-  .dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #left-panel::-webkit-scrollbar { width: 4px; }
+  #left-panel::-webkit-scrollbar-track { background: var(--bg); }
+  #left-panel::-webkit-scrollbar-thumb { background: var(--green-dim); }
 </style>
 </head>
 <body>
 <div id="root">
-  <div id="layout">
-    <!-- LEFT: Dev Panel -->
-    <div class="side-panel" id="left-panel" style="width:150px;">
-      <h3>⚙ Dev</h3>
-      <div class="dev-row">
-        <label>G (d-px/s²)</label>
-        <input type="number" id="ctrl-G" value="123" step="10">
-      </div>
-      <div class="dev-row">
-        <label>INIT_SPEED</label>
-        <input type="number" id="ctrl-INIT_SPEED" value="400" step="10">
-      </div>
-      <div class="dev-row">
-        <label>BALL_ANGLE (°)</label>
-        <input type="number" id="ctrl-INIT_ANGLE" value="49" step="1">
-      </div>
-      <div class="dev-row">
-        <label>BALL_RAD</label>
-        <input type="number" id="ctrl-BALL_RAD" value="5" step="1">
-      </div>
-      <div class="dev-row">
-        <label>JMP_SPEED</label>
-        <input type="number" id="ctrl-JMP_SPEED" value="250" step="10">
-      </div>
-      <div class="key-hint">
-        <span>←→</span> move<br>
-        <span>↑</span> jump<br>
-        <span>Q/W</span> rotate<br>
-        <span>SPACE</span> load/fire<br>
-        <span>TAB</span> switch paddle
-      </div>
-    </div>
 
-    <!-- CENTER: Game Canvas -->
-    <div id="game-wrap">
-      <canvas id="game-canvas"></canvas>
-      <div id="overlay" class="hidden">
-        <div class="countdown" id="countdown-num"></div>
-        <div class="msg" id="overlay-msg"></div>
-      </div>
-    </div>
+  <!-- LEFT DEV PANEL -->
+  <div id="left-panel">
+    <div id="title-logo">CLUBBALL</div>
+    <h3>DEV PARAMS</h3>
+    <!-- params injected by JS -->
+  </div>
 
-    <!-- RIGHT: Controls -->
-    <div class="side-panel" id="right-panel" style="width:150px;">
-      <h3>▶ Control</h3>
-      <button class="ctrl-btn" id="btn-restart">↺ Restart</button>
-      <button class="ctrl-btn" id="btn-pause">⏸ Pause</button>
-      <div class="score-display" id="score-display">RALLIES: 0</div>
-      <div style="margin-top:8px;">
-        <div class="status-indicator">
-          <div class="dot active" id="dot-p1"></div>
-          <span style="font-size:9px;color:var(--orange);">P1 ACTIVE</span>
-        </div>
-        <div class="status-indicator">
-          <div class="dot" id="dot-p2"></div>
-          <span style="font-size:9px;color:var(--yellow);">P2 STANDBY</span>
-        </div>
-      </div>
-      <div style="margin-top:8px; font-size:8px; color:var(--gray-mid); line-height:1.8; border-top:1px solid var(--gray-mid); padding-top:6px;">
-        <div style="color:var(--orange);">■</div> front face<br>
-        <div style="color:#7a3a10;">■</div> back face P1<br>
-        <div style="color:#6a5a10;">■</div> back face P2
-      </div>
+  <!-- GAME CANVAS -->
+  <div id="game-wrapper">
+    <canvas id="gc"></canvas>
+  </div>
+
+  <!-- RIGHT CONTROL PANEL -->
+  <div id="right-panel">
+    <h3>CONTROLS</h3>
+    <button class="ctrl-btn" id="btn-restart">⟳ RESTART</button>
+    <button class="ctrl-btn" id="btn-pause">⏸ PAUSE</button>
+    <div id="status-box"></div>
+    <div id="active-club-display">ACTIVE: CLUB 1</div>
+    <div class="key-hint">
+      ← → MOVE<br>
+      ↑ JUMP<br>
+      Q / W ROTATE<br>
+      TAB SWITCH CLUB<br>
+      SPACE LOAD/RELEASE
     </div>
   </div>
 </div>
 
 <script>
-(function() {
-  'use strict';
+// ─── CONSTANTS (mutable via dev panel) ───────────────────────────────────────
+const C = {
+  G: 50,
+  NET_DIST_FROM_LEFT_VW: 35,
+  AVT_LENGTH: 8,
+  AVT_THICK: 2,
+  INIT_JMP_SPEED: 60,
+  HOVER_DIST: 2,
+  LOADBACK_SPD: 5,
+  LOADBACK_RANGE: 5,
+  MAX_RLS_SPEED: 20,
+  KIN_LOSS: 0.15,
+  INIT_BALL_ANGL: 49,
+  INIT_BALL_SPEED: 50,
+  BALL_RAD: 2.5,
+};
 
-  const canvas = document.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
-  const overlay = document.getElementById('overlay');
-  const countdownEl = document.getElementById('countdown-num');
-  const overlayMsg = document.getElementById('overlay-msg');
-  const scoreDisplay = document.getElementById('score-display');
-  const dot1 = document.getElementById('dot-p1');
-  const dot2 = document.getElementById('dot-p2');
+// Dev panel param meta
+const PARAMS = [
+  {key:'G', label:'G (vh/s²)', min:1, max:200, step:1},
+  {key:'NET_DIST_FROM_LEFT_VW', label:'NET_DIST (vw)', min:10, max:70, step:0.5},
+  {key:'AVT_LENGTH', label:'AVT_LENGTH (vw)', min:2, max:20, step:0.5},
+  {key:'AVT_THICK', label:'AVT_THICK (vw)', min:0.5, max:6, step:0.1},
+  {key:'INIT_JMP_SPEED', label:'INIT_JMP_SPEED', min:10, max:150, step:1},
+  {key:'HOVER_DIST', label:'HOVER_DIST (vh)', min:0, max:20, step:0.1},
+  {key:'LOADBACK_SPD', label:'LOADBACK_SPD', min:1, max:30, step:0.5},
+  {key:'LOADBACK_RANGE', label:'LOADBACK_RANGE', min:1, max:15, step:0.5},
+  {key:'MAX_RLS_SPEED', label:'MAX_RLS_SPEED', min:5, max:80, step:1},
+  {key:'KIN_LOSS', label:'KIN_LOSS', min:0, max:0.9, step:0.01},
+  {key:'INIT_BALL_ANGL', label:'INIT_BALL_ANGL (°)', min:1, max:89, step:1},
+  {key:'INIT_BALL_SPEED', label:'INIT_BALL_SPEED', min:5, max:150, step:1},
+  {key:'BALL_RAD', label:'BALL_RAD (vw)', min:0.5, max:10, step:0.1},
+];
 
-  // Constants (mutable via dev panel)
-  let C = {
-    G: 123,
-    INIT_SPEED: 400,
-    INIT_ANGLE: 49,
-    BALL_RAD: 5,
-    JMP_SPEED: 250,
-  };
-
-  // Fixed constants
-  const D = 1; // d-pixel will be computed relative to canvas width
-  const NET_HEIGHT = 200;
-  const AVT_LENGTH = 75;
-  const AVT_THICK = 10;
-  const BUMP_DEPTH = 5;
-  const LOADBACK_SPD = 60;
-  const LOADBACK_RANGE = 75;
-  const MAX_REL_SPEED = 250;
-  const PADDLE_MOVE_SPD = 180;
-  const PADDLE_ROT_SPD = 2.5; // rad/sec
-  const RESTITUTION = 0.85;
-
-  // Sizing
-  let W, H, dp; // canvas width, height, d-pixel size in px
-
-  function resize() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // side panels = 150px each, margins = 10px
-    const leftPanelW = 150, rightPanelW = 150;
-    const sideTotalW = leftPanelW + rightPanelW + 4; // borders
-    const availW = vw - sideTotalW - 20;
-    const availH = vh - 20; // 10px top+bottom
-    // maintain aspect close to 16:9 but use available
-    const aspect = 16 / 9;
-    let cw = availW;
-    let ch = availH;
-    if (cw / ch > aspect) cw = ch * aspect;
-    else ch = cw / aspect;
-    canvas.width = Math.floor(cw);
-    canvas.height = Math.floor(ch);
-    W = canvas.width;
-    H = canvas.height;
-    dp = W / 1000; // 1 d-pixel
-    initGame();
-  }
-
-  // Game state
-  let state = {};
-  let keys = {};
-  let lastTime = null;
-  let paused = false;
-  let countingDown = false;
-  let countdownTimer = 0;
-  let rallies = 0;
-  let gameActive = false;
-  let animId = null;
-
-  function px(dpx) { return dpx * dp; }
-
-  function initGame() {
-    // Paddles start on ground, tilted 45° facing left-up
-    const groundY = H - px(AVT_THICK / 2);
-    const netX = W / 2;
-    const rightFieldCenter = (netX + W) / 2;
-
-    state = {
-      ball: {
-        x: px(5),
-        y: H - px(5),
-        vx: C.INIT_SPEED * dp * Math.cos((C.INIT_ANGLE) * Math.PI / 180),
-        vy: -C.INIT_SPEED * dp * Math.sin((C.INIT_ANGLE) * Math.PI / 180),
-        r: px(C.BALL_RAD),
-      },
-      paddles: [
-        {
-          x: rightFieldCenter - px(40),
-          y: groundY,
-          angle: -Math.PI * 0.75, // facing left-up (front = left side)
-          vx: 0,
-          vy: 0,
-          onGround: true,
-          loadback: 0,
-          loading: false,
-          color1: '#e07a2f', // front
-          color2: '#7a3a10', // back
-        },
-        {
-          x: rightFieldCenter + px(20),
-          y: groundY,
-          angle: -Math.PI * 0.75,
-          vx: 0,
-          vy: 0,
-          onGround: true,
-          loadback: 0,
-          loading: false,
-          color1: '#d4c44a',
-          color2: '#6a5a10',
-        },
-      ],
-      activeP: 0,
-    };
-
-    updateStatusUI();
-  }
-
-  function resetBall() {
-    state.ball = {
-      x: px(5),
-      y: H - px(5),
-      vx: C.INIT_SPEED * dp * Math.cos(C.INIT_ANGLE * Math.PI / 180),
-      vy: -C.INIT_SPEED * dp * Math.sin(C.INIT_ANGLE * Math.PI / 180),
-      r: px(C.BALL_RAD),
-    };
-  }
-
-  function startCountdown(msg) {
-    if (countingDown) return;
-    countingDown = true;
-    gameActive = false;
-    countdownTimer = 3;
-    overlay.classList.remove('hidden');
-    countdownEl.textContent = countdownTimer;
-    overlayMsg.textContent = msg || 'RESTART';
-
-    const tick = setInterval(() => {
-      countdownTimer--;
-      if (countdownTimer <= 0) {
-        clearInterval(tick);
-        countingDown = false;
-        overlay.classList.add('hidden');
-        rallies++;
-        scoreDisplay.textContent = 'RALLIES: ' + rallies;
-        resetBall();
-        gameActive = true;
-      } else {
-        countdownEl.textContent = countdownTimer;
-      }
-    }, 1000);
-  }
-
-  // Input
-  document.addEventListener('keydown', e => {
-    keys[e.code] = true;
-
-    if (e.code === 'Tab') {
-      e.preventDefault();
-      state.activeP = 1 - state.activeP;
-      updateStatusUI();
-    }
-
-    if (e.code === 'Space') {
-      e.preventDefault();
-      const p = state.paddles[state.activeP];
-      p.loading = true;
-    }
+// Build dev panel
+const leftPanel = document.getElementById('left-panel');
+PARAMS.forEach(p => {
+  const row = document.createElement('div');
+  row.className = 'param-row';
+  const lbl = document.createElement('label');
+  lbl.className = 'param-label';
+  lbl.textContent = p.label;
+  const inp = document.createElement('input');
+  inp.type = 'number';
+  inp.min = p.min; inp.max = p.max; inp.step = p.step;
+  inp.value = C[p.key];
+  inp.addEventListener('change', () => {
+    C[p.key] = parseFloat(inp.value);
   });
-
-  document.addEventListener('keyup', e => {
-    keys[e.code] = false;
-    if (e.code === 'Space') {
-      const p = state.paddles[state.activeP];
-      if (p.loading) {
-        p.loading = false;
-        // Release: fire paddle back to original pos
-        p.releasing = true;
-        p.releaseSpeed = MAX_REL_SPEED * dp * (p.loadback / px(LOADBACK_RANGE));
-      }
-    }
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter') { inp.blur(); }
   });
+  // Blur on mouseup to prevent accidental changes while playing
+  inp.addEventListener('mouseup', () => { inp.blur(); });
+  row.appendChild(lbl);
+  row.appendChild(inp);
+  leftPanel.appendChild(row);
+});
 
-  function updateStatusUI() {
-    if (!state) return;
-    dot1.classList.toggle('active', state.activeP === 0);
-    dot2.classList.toggle('active', state.activeP === 1);
-    document.getElementById('dot-p1').parentElement.querySelector('span').textContent =
-      state.activeP === 0 ? 'P1 ACTIVE' : 'P1 STANDBY';
-    document.getElementById('dot-p2').parentElement.querySelector('span').textContent =
-      state.activeP === 1 ? 'P2 ACTIVE' : 'P2 STANDBY';
-    document.getElementById('dot-p1').parentElement.querySelector('span').style.color =
-      state.activeP === 0 ? 'var(--orange)' : 'var(--gray-light)';
-    document.getElementById('dot-p2').parentElement.querySelector('span').style.color =
-      state.activeP === 1 ? 'var(--yellow)' : 'var(--gray-light)';
+// ─── CANVAS SETUP ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('game-wrapper');
+
+let W, H; // px dimensions of canvas
+
+function resize() {
+  W = wrapper.clientWidth;
+  H = wrapper.clientHeight;
+  canvas.width = W;
+  canvas.height = H;
+}
+resize();
+window.addEventListener('resize', () => { resize(); });
+
+// Unit helpers: convert vw/vh to px at runtime
+function vw(x) { return x * W / 100; }
+function vh(x) { return x * H / 100; }
+
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
+let paused = false;
+let countdownActive = false;
+let countdownTimer = 0;
+let lastTime = null;
+
+// Input state
+const keys = {};
+window.addEventListener('keydown', e => {
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','Tab'].includes(e.key)) e.preventDefault();
+  if(e.key === 'Tab') {
+    e.preventDefault();
+    if(!paused && !countdownActive) switchActiveClub();
+    return;
+  }
+  keys[e.key] = true;
+  if(e.key === ' ' && !paused) {
+    if(!club[activeClub].loadSpaceHeld) {
+      club[activeClub].loadSpaceHeld = true;
+      club[activeClub].loadBackTarget = true;
+    }
+  }
+});
+window.addEventListener('keyup', e => {
+  keys[e.key] = false;
+  if(e.key === ' ') {
+    club[activeClub].loadSpaceHeld = false;
+    club[activeClub].releaseTriggered = true;
+  }
+});
+
+let activeClub = 0;
+function switchActiveClub() {
+  activeClub = 1 - activeClub;
+  document.getElementById('active-club-display').textContent = `ACTIVE: CLUB ${activeClub+1}`;
+}
+
+// ─── CLUB CLASS ──────────────────────────────────────────────────────────────
+class Club {
+  constructor(id) {
+    this.id = id;
+    this.reset();
   }
 
-  function getPaddleBackDirection(p) {
-    // The paddle long axis is at angle p.angle
-    // front = direction the front face points (perpendicular to long axis, "outward")
-    // The paddle is a rectangle lying along angle p.angle
-    // front face normal: rotate long axis by -90 deg
-    const frontNx = Math.sin(p.angle);
-    const frontNy = -Math.cos(p.angle);
-    // back is opposite
-    return { x: -frontNx, y: -frontNy };
+  reset() {
+    // Initial position: both clubs in right field, stacked
+    // Initial angle: side1 facing left-upward diagonally (pointing -135 deg)
+    // "pointy back (side2) pointing down-right" => angle = -45 deg from horizontal for side1 face
+    const rightStart = vw(C.NET_DIST_FROM_LEFT_VW) + vw(8) + vw(4) * this.id;
+    this.x = vw(C.NET_DIST_FROM_LEFT_VW) + vw(12) + vw(5) * this.id;
+    this.y = H - vh(C.HOVER_DIST) - vw(C.AVT_THICK)/2;
+    this.angle = -Math.PI * 3/4; // side1 facing up-left
+    this.vx = 0;
+    this.vy = 0;
+    this.onGround = true;
+    this.jumping = false;
+    this.loadOffset = 0; // current load back amount in px
+    this.loadSpaceHeld = false;
+    this.releaseTriggered = false;
+    this.loadVx = 0; // velocity of load/release
+    this.bumpVx = 0;
+    this.bumpVy = 0;
   }
 
-  function updatePaddle(p, dt, isActive) {
-    const netX = W / 2;
-    const halfLen = px(AVT_LENGTH / 2);
+  get halfLen() { return vw(C.AVT_LENGTH) / 2; }
+  get thick() { return vw(C.AVT_THICK); }
+  get bumpDepth() { return vw(3); }
 
-    if (isActive) {
-      // Movement
-      if (keys['ArrowLeft']) p.vx = -PADDLE_MOVE_SPD * dp;
-      else if (keys['ArrowRight']) p.vx = PADDLE_MOVE_SPD * dp;
-      else p.vx *= 0.7;
-
-      // Rotation
-      if (keys['KeyQ']) p.angle -= PADDLE_ROT_SPD * dt;
-      if (keys['KeyW']) p.angle += PADDLE_ROT_SPD * dt;
-
-      // Jump
-      if (keys['ArrowUp'] && p.onGround) {
-        p.vy = -C.JMP_SPEED * dp;
-        p.onGround = false;
-      }
-    } else {
-      p.vx *= 0.7;
-    }
-
-    // Loadback
-    if (isActive && p.loading && !p.releasing) {
-      const maxLB = px(LOADBACK_RANGE);
-      if (p.loadback < maxLB) {
-        p.loadback += LOADBACK_SPD * dp * dt;
-        if (p.loadback > maxLB) p.loadback = maxLB;
-      }
-    }
-
-    if (p.releasing) {
-      p.loadback -= p.releaseSpeed * dt;
-      if (p.loadback <= 0) {
-        p.loadback = 0;
-        p.releasing = false;
-        p.releaseSpeed = 0;
-      }
-    }
-
-    // Gravity
-    if (!p.onGround) {
-      p.vy += C.G * dp * dt;
-    }
-
-    // Move
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-
-    // Ground collision
-    const groundY = H - px(AVT_THICK / 2);
-    if (p.y >= groundY) {
-      p.y = groundY;
-      p.vy = 0;
-      p.onGround = true;
-    }
-
-    // Confine to right field
-    const minX = netX + halfLen + 2;
-    const maxX = W - halfLen - 2;
-    if (p.x < minX) { p.x = minX; p.vx = 0; }
-    if (p.x > maxX) { p.x = maxX; p.vx = 0; }
-  }
-
-  // Get paddle corners in world space (without loadback offset)
-  function getPaddleWorldPos(p) {
-    // Back direction for loadback offset
-    const back = getPaddleBackDirection(p);
-    const bx = p.x + back.x * p.loadback;
-    const by = p.y + back.y * p.loadback;
-    return { x: bx, y: by };
-  }
-
-  // Get 4 corners of paddle rectangle
-  function getPaddleCorners(p) {
-    const pos = getPaddleWorldPos(p);
-    const halfLen = px(AVT_LENGTH / 2);
-    const halfThick = px(AVT_THICK / 2);
-    const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
-    // Along long axis: ca,sa; along short axis: -sa, ca (perpendicular)
-    const corners = [
-      { x: pos.x + ca * halfLen - sa * halfThick, y: pos.y + sa * halfLen + ca * halfThick },
-      { x: pos.x + ca * halfLen + sa * halfThick, y: pos.y + sa * halfLen - ca * halfThick },
-      { x: pos.x - ca * halfLen + sa * halfThick, y: pos.y - sa * halfLen - ca * halfThick },
-      { x: pos.x - ca * halfLen - sa * halfThick, y: pos.y - sa * halfLen + ca * halfThick },
+  // Returns the four corners of the main rectangle (no bump)
+  getCorners(ox=0, oy=0) {
+    const cos = Math.cos(this.angle), sin = Math.sin(this.angle);
+    const hl = this.halfLen, ht = this.thick / 2;
+    // local: side1 at -y (top face), side2 at +y (bottom face)
+    return [
+      {x: this.x + ox + cos*(-hl) - sin*(-ht), y: this.y + oy + sin*(-hl) + cos*(-ht)}, // side1-left
+      {x: this.x + ox + cos*(hl)  - sin*(-ht), y: this.y + oy + sin*(hl)  + cos*(-ht)}, // side1-right
+      {x: this.x + ox + cos*(hl)  - sin*(ht),  y: this.y + oy + sin*(hl)  + cos*(ht)},  // side2-right
+      {x: this.x + ox + cos*(-hl) - sin*(ht),  y: this.y + oy + sin*(-hl) + cos*(ht)},  // side2-left
     ];
-    return corners;
   }
 
-  // Closest point on segment to point
-  function closestPointOnSegment(ax, ay, bx, by, px, py) {
-    const dx = bx - ax, dy = by - ay;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) return { x: ax, y: ay, t: 0 };
-    let t = ((px - ax) * dx + (py - ay) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-    return { x: ax + t * dx, y: ay + t * dy, t };
+  // side2 normal direction (outward from side2 face)
+  getSide2Normal() {
+    const cos = Math.cos(this.angle), sin = Math.sin(this.angle);
+    // side2 faces +y locally => world normal = (sin(angle) rotated): actually local +y => world (sin, -cos) ... no
+    // local y-axis in world = (sin(angle), -cos(angle))... let's think:
+    // local x = (cos, sin), local y = (-sin, cos)
+    // side2 is at local +y, so outward normal = local +y direction = (-sin(angle), cos(angle))
+    return { x: -sin, y: cos };
   }
 
-  function ballPaddleCollision(ball, p) {
-    const pos = getPaddleWorldPos(p);
-    const halfLen = px(AVT_LENGTH / 2);
-    const halfThick = px(AVT_THICK / 2);
-    const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
+  getSide1Normal() {
+    const cos = Math.cos(this.angle), sin = Math.sin(this.angle);
+    return { x: sin, y: -cos };
+  }
 
-    // Transform ball to paddle local space
-    const localX = (ball.x - pos.x) * ca + (ball.y - pos.y) * sa;
-    const localY = -(ball.x - pos.x) * sa + (ball.y - pos.y) * ca;
+  // The displacement for load-back: along side2 normal direction
+  getLoadDisp() {
+    const n = this.getSide2Normal();
+    return { x: n.x * this.loadOffset, y: n.y * this.loadOffset };
+  }
 
-    const r = ball.r;
-    // Expanded rectangle
-    if (localX < -(halfLen + r) || localX > (halfLen + r) ||
-        localY < -(halfThick + r) || localY > (halfThick + r)) return false;
+  update(dt, clubOther) {
+    const isActive = this.id === activeClub;
+    const netX = vw(C.NET_DIST_FROM_LEFT_VW);
+    const groundY = H - 0; // ground at H
+    const hoverY = H - vh(C.HOVER_DIST) - this.thick / 2;
+    const minX = netX + this.halfLen + vw(0.5);
+    const maxX = W - this.halfLen - vw(0.5);
 
-    // Closest point on rect in local space
-    const clampedX = Math.max(-halfLen, Math.min(halfLen, localX));
-    const clampedY = Math.max(-halfThick, Math.min(halfThick, localY));
-    const dx = localX - clampedX;
-    const dy = localY - clampedY;
-    const dist2 = dx * dx + dy * dy;
+    // Gravity / vertical
+    if(!this.onGround) {
+      this.vy += vh(C.G) * dt;
+    }
 
-    if (dist2 > r * r) return false;
-    if (dist2 === 0) {
-      // Inside rectangle: push out nearest edge
-      const overlapX = halfLen - Math.abs(localX);
-      const overlapY = halfThick - Math.abs(localY);
-      let nx, ny;
-      if (overlapX < overlapY) {
-        nx = localX > 0 ? 1 : -1; ny = 0;
-      } else {
-        nx = 0; ny = localY > 0 ? 1 : -1;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    // Land
+    if(this.y >= hoverY) {
+      this.y = hoverY;
+      this.vy = 0;
+      this.vx = 0;
+      this.onGround = true;
+      this.jumping = false;
+    }
+
+    // Horizontal movement (only if not jumping, or rather, no control during jump)
+    if(!this.jumping && isActive) {
+      const spd = vw(20); // move speed
+      if(keys['ArrowLeft'])  this.x -= spd * dt;
+      if(keys['ArrowRight']) this.x += spd * dt;
+    }
+
+    // Rotation
+    if(isActive) {
+      const rotSpd = 2.5; // rad/sec
+      if(keys['q'] || keys['Q']) this.angle -= rotSpd * dt;
+      if(keys['w'] || keys['W']) this.angle += rotSpd * dt;
+    }
+
+    // Jump
+    if(!this.jumping && this.onGround && isActive && keys['ArrowUp']) {
+      this.vy = -vh(C.INIT_JMP_SPEED);
+      this.onGround = false;
+      this.jumping = true;
+    }
+
+    // Constrain X
+    if(this.x < minX) this.x = minX;
+    if(this.x > maxX) this.x = maxX;
+
+    // ── Load back / release ──
+    const lv = vw(C.LOADBACK_SPD);
+    const maxLoad = vw(C.LOADBACK_RANGE);
+    const relSpd = vw(C.MAX_RLS_SPEED);
+
+    if(this.loadSpaceHeld && isActive) {
+      // Load back (increase offset along side2)
+      if(this.loadOffset < maxLoad) {
+        this.loadOffset = Math.min(maxLoad, this.loadOffset + lv * dt);
       }
-      // Back to world
-      const wnx = nx * ca - ny * sa;
-      const wny = nx * sa + ny * ca;
-      resolveBallCollision(ball, p, wnx, wny, Math.min(overlapX, overlapY));
-      return true;
-    }
-
-    const dist = Math.sqrt(dist2);
-    const nx_local = dx / dist;
-    const ny_local = dy / dist;
-    const penetration = r - dist;
-    const wnx = nx_local * ca - ny_local * sa;
-    const wny = nx_local * sa + ny_local * ca;
-    resolveBallCollision(ball, p, wnx, wny, penetration);
-    return true;
-  }
-
-  function resolveBallCollision(ball, p, nx, ny, penetration) {
-    // Push ball out
-    ball.x += nx * penetration;
-    ball.y += ny * penetration;
-
-    // Paddle velocity at contact point (could add rotation later)
-    const pvx = p.vx;
-    const pvy = p.releasing && p.releaseSpeed > 0
-      ? -getPaddleBackDirection(p).y * p.releaseSpeed
-      : 0;
-    const pvx2 = p.releasing ? -getPaddleBackDirection(p).x * p.releaseSpeed : pvx;
-    const pvy2 = p.releasing ? -getPaddleBackDirection(p).y * p.releaseSpeed : pvy;
-
-    // Relative velocity
-    const rvx = ball.vx - pvx2;
-    const rvy = ball.vy - pvy2;
-    const dot = rvx * nx + rvy * ny;
-    if (dot >= 0) return; // separating
-
-    const j = -(1 + RESTITUTION) * dot;
-    ball.vx += j * nx;
-    ball.vy += j * ny;
-  }
-
-  // Net collision
-  function ballNetCollision(ball) {
-    const netX = W / 2;
-    const netTop = H - px(NET_HEIGHT);
-    const netWidth = 4;
-
-    if (ball.x + ball.r > netX - netWidth / 2 &&
-        ball.x - ball.r < netX + netWidth / 2 &&
-        ball.y > netTop) {
-      // Push ball out
-      if (ball.x < netX) {
-        ball.x = netX - netWidth / 2 - ball.r;
-      } else {
-        ball.x = netX + netWidth / 2 + ball.r;
+    } else if(this.releaseTriggered) {
+      // Release - spring back fast, will set velocity for impact
+      const ratio = this.loadOffset / maxLoad;
+      const releaseV = relSpd * ratio; // speed of release
+      // Store release velocity to apply to ball contact
+      this._releaseV = releaseV;
+      this._releaseN = this.getSide1Normal(); // side1 faces outward
+      this.loadOffset = Math.max(0, this.loadOffset - releaseV * 5 * dt);
+      if(this.loadOffset <= 0) {
+        this.loadOffset = 0;
+        this.releaseTriggered = false;
+        this._releaseV = 0;
       }
-      ball.vx = -ball.vx * RESTITUTION;
+    }
+
+    // Club-club collision (simple: push apart)
+    if(clubOther) {
+      const dx = this.x - clubOther.x, dy = this.y - clubOther.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const minDist = this.halfLen * 0.7;
+      if(dist < minDist && dist > 0.001) {
+        const push = (minDist - dist) / 2;
+        this.x += dx/dist * push;
+        this.y += dy/dist * push;
+        clubOther.x -= dx/dist * push;
+        clubOther.y -= dy/dist * push;
+      }
     }
   }
 
-  // Ball ground collision
-  function ballGroundCollision(ball) {
-    if (ball.y + ball.r > H) {
-      ball.y = H - ball.r;
-      ball.vy = -ball.vy * RESTITUTION;
-      ball.vx *= 0.95;
-    }
-  }
+  draw(isActive) {
+    ctx.save();
+    const ld = this.getLoadDisp();
+    const cx = this.x + ld.x;
+    const cy = this.y + ld.y;
 
-  function update(dt) {
-    if (!gameActive || paused || countingDown) return;
+    ctx.translate(cx, cy);
+    ctx.rotate(this.angle);
 
-    const ball = state.ball;
-    const grav = C.G * dp;
+    const hl = this.halfLen;
+    const ht = this.thick / 2;
+    const bumpD = this.bumpDepth;
 
-    // Ball gravity
-    ball.vy += grav * dt;
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
+    // side1 face color (bright) - local top (-y) = bright
+    // side2 face color (dark) - local bottom (+y) = dim
+    const isActive1 = isActive;
+    const col1 = isActive1 ? (this.id===0 ? '#f5c518' : '#ff6b1a') : (this.id===0 ? '#7a6610' : '#7a3410');
+    const col2 = isActive1 ? (this.id===0 ? '#4a4010' : '#4a2410') : (this.id===0 ? '#2a2208' : '#2a1408');
 
-    // Ball: OOB check (top, left, right)
-    if (ball.y - ball.r < 0 || ball.x - ball.r < 0 || ball.x + ball.r > W) {
-      startCountdown('OUT OF BOUNDS');
-      return;
-    }
+    // Draw main rectangle - side1 top half
+    ctx.fillStyle = col1;
+    ctx.fillRect(-hl, -ht, hl*2, ht);
 
-    // Ball ground
-    ballGroundCollision(ball);
+    // side2 bottom half
+    ctx.fillStyle = col2;
+    ctx.fillRect(-hl, 0, hl*2, ht);
 
-    // Ball net
-    ballNetCollision(ball);
+    // Border
+    ctx.strokeStyle = isActive1 ? '#ffffff30' : '#ffffff10';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-hl, -ht, hl*2, ht*2);
 
-    // Ball radius update
-    ball.r = px(C.BALL_RAD);
-
-    // Paddles
-    for (let i = 0; i < 2; i++) {
-      updatePaddle(state.paddles[i], dt, i === state.activeP);
-    }
-
-    // Ball-paddle collisions
-    for (let i = 0; i < 2; i++) {
-      ballPaddleCollision(ball, state.paddles[i]);
-    }
-  }
-
-  // Drawing
-  function drawNet() {
-    const netX = W / 2;
-    const netTop = H - px(NET_HEIGHT);
-    const netW = 4;
-
-    // Net body gradient
-    const grad = ctx.createLinearGradient(netX - netW / 2, 0, netX + netW / 2, 0);
-    grad.addColorStop(0, '#1a4a1e');
-    grad.addColorStop(0.5, '#3ddc6e');
-    grad.addColorStop(1, '#1a4a1e');
-    ctx.fillStyle = grad;
-    ctx.fillRect(netX - netW / 2, netTop, netW, H - netTop);
-
-    // Net top cap
-    ctx.fillStyle = '#5dfc8e';
-    ctx.fillRect(netX - netW * 1.5, netTop - 3, netW * 3, 5);
-
-    // Horizontal lines on net
-    ctx.strokeStyle = '#1e6b3a';
-    ctx.lineWidth = 0.5;
-    for (let y = netTop + 10; y < H; y += 15) {
+    // Active glow line on side1
+    if(isActive1) {
+      ctx.strokeStyle = this.id===0 ? '#f5c518' : '#ff6b1a';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(netX - netW / 2, y);
-      ctx.lineTo(netX + netW / 2, y);
+      ctx.moveTo(-hl, -ht);
+      ctx.lineTo(hl, -ht);
       ctx.stroke();
     }
-  }
 
-  function drawGround() {
-    // Ground line
-    ctx.strokeStyle = '#2a4a2e';
-    ctx.lineWidth = 1.5;
+    // Bump on side2 (outward = +y direction locally)
+    // Bump is a triangle or wedge sticking out from side2 face
+    const bumpW = hl * 0.5;
+    ctx.fillStyle = isActive1 ? (this.id===0 ? '#d4a800' : '#d44a00') : '#2a2208';
     ctx.beginPath();
-    ctx.moveTo(0, H - 1);
-    ctx.lineTo(W, H - 1);
-    ctx.stroke();
-    // subtle ground glow
-    const grad = ctx.createLinearGradient(0, H - 8, 0, H);
-    grad.addColorStop(0, 'rgba(61,220,110,0.08)');
-    grad.addColorStop(1, 'rgba(61,220,110,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, H - 8, W, 8);
-  }
-
-  function drawBackground() {
-    // Dark background with scanlines
-    ctx.fillStyle = '#0a0d0b';
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle grid
-    ctx.strokeStyle = 'rgba(42,74,46,0.2)';
-    ctx.lineWidth = 0.5;
-    const grid = px(50);
-    for (let x = 0; x < W; x += grid) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y < H; y += grid) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-  }
-
-  function drawPaddle(p, isActive) {
-    const pos = getPaddleWorldPos(p);
-    const halfLen = px(AVT_LENGTH / 2);
-    const halfThick = px(AVT_THICK / 2);
-    const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
-
-    ctx.save();
-    ctx.translate(pos.x, pos.y);
-    ctx.rotate(p.angle);
-
-    // Glow if active
-    if (isActive) {
-      ctx.shadowColor = p.color1;
-      ctx.shadowBlur = 12;
-    }
-
-    // Back face (behind the rotation center relative to front)
-    // Front face is +y direction in local space (when angle=0, front points "up" = negative y)
-    // Actually: long axis = x-axis. Thick axis = y-axis. 
-    // Let's say front = -y half, back = +y half
-    ctx.fillStyle = p.color2;
-    ctx.fillRect(-halfLen, 0, px(AVT_LENGTH), halfThick);
-
-    ctx.fillStyle = p.color1;
-    ctx.fillRect(-halfLen, -halfThick, px(AVT_LENGTH), halfThick);
-
-    // Edge line between faces
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.moveTo(-bumpW/2, ht);
+    ctx.lineTo(bumpW/2, ht);
+    ctx.lineTo(0, ht + bumpD);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff18';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-halfLen, 0); ctx.lineTo(halfLen, 0);
     ctx.stroke();
-
-    // Bump on back (+ y side = back face)
-    const bumpH = px(BUMP_DEPTH);
-    const bumpW = px(AVT_LENGTH * 0.3);
-    ctx.fillStyle = p.color2;
-    ctx.beginPath();
-    ctx.rect(-bumpW / 2, halfThick, bumpW, bumpH);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(-bumpW / 2, halfThick, bumpW, bumpH);
-
-    // Active highlight
-    if (isActive) {
-      ctx.strokeStyle = p.color1;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-halfLen, -halfThick, px(AVT_LENGTH), px(AVT_THICK));
-    }
-
-    ctx.shadowBlur = 0;
-    ctx.restore();
-
-    // Load indicator
-    if (p.loadback > 0) {
-      const frac = p.loadback / px(LOADBACK_RANGE);
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = `hsl(${30 + frac * 30}, 90%, 60%)`;
-      const indR = 4;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, indR, 0, Math.PI * 2 * frac);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  function drawBall(ball) {
-    ctx.save();
-    // Glow
-    ctx.shadowColor = '#e0d0b0';
-    ctx.shadowBlur = px(8);
-
-    const grad = ctx.createRadialGradient(
-      ball.x - ball.r * 0.3, ball.y - ball.r * 0.3, ball.r * 0.1,
-      ball.x, ball.y, ball.r
-    );
-    grad.addColorStop(0, '#fff8e0');
-    grad.addColorStop(0.6, '#d4c090');
-    grad.addColorStop(1, '#7a6040');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Shine
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.beginPath();
-    ctx.arc(ball.x - ball.r * 0.25, ball.y - ball.r * 0.25, ball.r * 0.3, 0, Math.PI * 2);
-    ctx.fill();
 
     ctx.restore();
   }
 
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-    drawBackground();
-    drawGround();
-    drawNet();
-
-    // Center line (subtle)
-    ctx.strokeStyle = 'rgba(61,220,110,0.05)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([5, 10]);
-    ctx.beginPath();
-    ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    for (let i = 0; i < 2; i++) {
-      drawPaddle(state.paddles[i], i === state.activeP);
-    }
-    drawBall(state.ball);
-
-    // Active paddle marker
-    const ap = state.paddles[state.activeP];
-    const apos = getPaddleWorldPos(ap);
-    ctx.save();
-    ctx.strokeStyle = state.activeP === 0 ? '#e07a2f' : '#d4c44a';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-    ctx.beginPath();
-    ctx.arc(apos.x, apos.y - px(12), px(3), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-
-  function loop(ts) {
-    if (!lastTime) lastTime = ts;
-    const dt = Math.min((ts - lastTime) / 1000, 0.05);
-    lastTime = ts;
-
-    update(dt);
-    draw();
-
-    animId = requestAnimationFrame(loop);
-  }
-
-  // Dev panel input events
-  function bindDevInputs() {
-    const inputs = {
-      'ctrl-G': 'G',
-      'ctrl-INIT_SPEED': 'INIT_SPEED',
-      'ctrl-INIT_ANGLE': 'INIT_ANGLE',
-      'ctrl-BALL_RAD': 'BALL_RAD',
-      'ctrl-JMP_SPEED': 'JMP_SPEED',
+  // Returns list of line segments for collision: [{p1,p2, side:'side1'|'side2'|'bump'}]
+  getSegments() {
+    const ld = this.getLoadDisp();
+    const ox = ld.x, oy = ld.y;
+    const corners = this.getCorners(ox, oy);
+    // corners: 0=side1-left, 1=side1-right, 2=side2-right, 3=side2-left
+    const bumpDepth = this.bumpDepth;
+    const cos = Math.cos(this.angle), sin = Math.sin(this.angle);
+    const halfBump = vw(C.AVT_LENGTH) * 0.25;
+    // bump tip
+    const bumpTip = {
+      x: this.x + ox + (-sin) * (this.thick/2 + bumpDepth),
+      y: this.y + oy + cos * (this.thick/2 + bumpDepth)
     };
-    for (const [id, key] of Object.entries(inputs)) {
-      const el = document.getElementById(id);
-      el.addEventListener('change', () => {
-        C[key] = parseFloat(el.value) || C[key];
-        el.blur(); // release focus so keys work again
-      });
-      el.addEventListener('keydown', e => {
-        if (e.code === 'Enter') {
-          C[key] = parseFloat(el.value) || C[key];
-          el.blur();
-        }
-      });
+    const bumpL = {
+      x: corners[3].x + (cos * -halfBump - sin * 0),
+      y: corners[3].y + (sin * -halfBump + cos * 0)
+    };
+    const bumpR = {
+      x: corners[2].x + (cos * halfBump - sin * 0),
+      y: corners[2].y + (sin * halfBump + cos * 0)
+    };
+    // Approximate bump with midpoint of side2 edge
+    const bumpMid = {
+      x: (corners[2].x + corners[3].x)/2,
+      y: (corners[2].y + corners[3].y)/2,
+    };
+
+    return [
+      {p1: corners[0], p2: corners[1], side: 'side1'},
+      {p1: corners[1], p2: corners[2], side: 'end'},
+      {p1: corners[2], p2: corners[3], side: 'side2'},
+      {p1: corners[3], p2: corners[0], side: 'end'},
+      // bump faces
+      {p1: corners[3], p2: bumpTip, side: 'side2'},
+      {p1: bumpTip, p2: corners[2], side: 'side2'},
+    ];
+  }
+}
+
+// ─── BALL ────────────────────────────────────────────────────────────────────
+let ball = { x:0, y:0, vx:0, vy:0 };
+
+function initBall() {
+  ball.x = vw(1);
+  ball.y = H - vw(C.BALL_RAD) - vh(1);
+  const ang = C.INIT_BALL_ANGL * Math.PI / 180;
+  const spd = vw(C.INIT_BALL_SPEED);
+  ball.vx = spd * Math.cos(ang);
+  ball.vy = -spd * Math.sin(ang);
+}
+
+// ─── CLUBS ───────────────────────────────────────────────────────────────────
+let club = [new Club(0), new Club(1)];
+
+function resetGame() {
+  activeClub = 0;
+  document.getElementById('active-club-display').textContent = `ACTIVE: CLUB 1`;
+  club[0].reset();
+  club[1].reset();
+  // Reposition based on current C values
+  const netX = vw(C.NET_DIST_FROM_LEFT_VW);
+  const hoverY = H - vh(C.HOVER_DIST) - vw(C.AVT_THICK)/2;
+  club[0].x = netX + vw(8);
+  club[0].y = hoverY;
+  club[0].angle = -Math.PI * 3/4;
+  club[1].x = netX + vw(14);
+  club[1].y = hoverY;
+  club[1].angle = -Math.PI * 3/4;
+  initBall();
+  countdownActive = false;
+  setStatus('');
+}
+
+// ─── NET ─────────────────────────────────────────────────────────────────────
+function getNetX() { return vw(C.NET_DIST_FROM_LEFT_VW); }
+const NET_THICKNESS = 6; // px
+const NET_HEIGHT_VH = 18; // vh
+
+// ─── COLLISION HELPERS ───────────────────────────────────────────────────────
+// Closest point on segment to point P
+function closestPointOnSegment(px, py, ax, ay, bx, by) {
+  const abx = bx-ax, aby = by-ay;
+  const apx = px-ax, apy = py-ay;
+  const t = Math.max(0, Math.min(1, (apx*abx + apy*aby)/(abx*abx+aby*aby+1e-9)));
+  return {x: ax+t*abx, y: ay+t*aby, t};
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const cp = closestPointOnSegment(px,py,ax,ay,bx,by);
+  const dx=px-cp.x, dy=py-cp.y;
+  return {dist: Math.sqrt(dx*dx+dy*dy), cp, dx, dy};
+}
+
+// ─── BALL–NET COLLISION ───────────────────────────────────────────────────────
+function ballNetCollision() {
+  const netX = getNetX();
+  const netTop = H - vh(NET_HEIGHT_VH);
+  const r = vw(C.BALL_RAD);
+  if(ball.x + r > netX - NET_THICKNESS/2 && ball.x - r < netX + NET_THICKNESS/2) {
+    if(ball.y + r > netTop) {
+      // Bounce off net side
+      if(ball.x < netX) {
+        ball.x = netX - NET_THICKNESS/2 - r;
+        ball.vx = -Math.abs(ball.vx) * 0.7;
+      } else {
+        ball.x = netX + NET_THICKNESS/2 + r;
+        ball.vx = Math.abs(ball.vx) * 0.7;
+      }
+    }
+  }
+}
+
+// ─── BALL–GROUND COLLISION ────────────────────────────────────────────────────
+function ballGroundCollision() {
+  const r = vw(C.BALL_RAD);
+  if(ball.y + r >= H) {
+    ball.y = H - r;
+    ball.vy = -Math.abs(ball.vy) * 0.65;
+    ball.vx *= 0.9;
+  }
+}
+
+// ─── BALL–CLUB COLLISION ──────────────────────────────────────────────────────
+function ballClubCollision(cl) {
+  const r = vw(C.BALL_RAD);
+  const segments = cl.getSegments();
+  const ld = cl.getLoadDisp();
+
+  // Club velocity (approx)
+  // We'll estimate club velocity from release if happening
+  let clubVx = cl.jumping ? cl.vx : 0;
+  let clubVy = cl.jumping ? cl.vy : 0;
+
+  // If releasing: add release velocity along side1 normal
+  if(cl._releaseV && cl._releaseV > 0 && cl._releaseN) {
+    clubVx += cl._releaseN.x * cl._releaseV;
+    clubVy += cl._releaseN.y * cl._releaseV;
+  }
+
+  for(const seg of segments) {
+    const {dist, cp, dx, dy} = distToSegment(ball.x, ball.y, seg.p1.x, seg.p1.y, seg.p2.x, seg.p2.y);
+    if(dist < r && dist > 0.0001) {
+      // Normal from segment toward ball
+      const nx = dx/dist, ny = dy/dist;
+
+      // Determine if this is side1 hit or side2 hit
+      // side2 hit = ball passes through (no effect)
+      if(seg.side === 'side2') {
+        // No effect, ball passes through
+        continue;
+      }
+
+      // Push ball out
+      ball.x = cp.x + nx * r * 1.01;
+      ball.y = cp.y + ny * r * 1.01;
+
+      // Relative velocity of ball w.r.t. club surface
+      const relVx = ball.vx - clubVx;
+      const relVy = ball.vy - clubVy;
+
+      // Reflect relative velocity about normal
+      const dot = relVx * nx + relVy * ny;
+      if(dot < 0) { // only if approaching
+        // KIN_LOSS: reflect with energy loss
+        const lossF = Math.sqrt(1 - C.KIN_LOSS);
+        const newRelVx = relVx - 2 * dot * nx;
+        const newRelVy = relVy - 2 * dot * ny;
+
+        ball.vx = (newRelVx * lossF) + clubVx;
+        ball.vy = (newRelVy * lossF) + clubVy;
+      }
+
+      // Reset release velocity after impact
+      cl._releaseV = 0;
+      break;
+    }
+  }
+}
+
+// ─── OUT OF BOUNDS CHECK ──────────────────────────────────────────────────────
+function checkOutOfBounds() {
+  const r = vw(C.BALL_RAD);
+  // Out if: right side, left side, top
+  if(ball.x - r > W || ball.x + r < 0 || ball.y + r < 0) {
+    triggerRestart();
+  }
+}
+
+let restartTimer = 0;
+function triggerRestart() {
+  if(countdownActive) return;
+  countdownActive = true;
+  restartTimer = 2.5;
+  setStatus('RESTARTING...');
+}
+
+function setStatus(msg) {
+  document.getElementById('status-box').textContent = msg;
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+function gameLoop(ts) {
+  if(!lastTime) lastTime = ts;
+  let dt = (ts - lastTime) / 1000;
+  lastTime = ts;
+  dt = Math.min(dt, 0.05); // cap
+
+  // Resize canvas dynamically
+  if(canvas.width !== wrapper.clientWidth || canvas.height !== wrapper.clientHeight) {
+    resize();
+    resetGame();
+  }
+
+  if(!paused) {
+    if(countdownActive) {
+      restartTimer -= dt;
+      setStatus(`RESTART IN ${Math.ceil(restartTimer)}...`);
+      if(restartTimer <= 0) {
+        resetGame();
+      }
+    } else {
+      update(dt);
     }
   }
 
-  // Buttons
-  document.getElementById('btn-restart').addEventListener('click', () => {
-    if (countingDown) return;
-    rallies = 0;
-    scoreDisplay.textContent = 'RALLIES: 0';
-    initGame();
-    gameActive = true;
-    overlay.classList.add('hidden');
-  });
+  draw();
+  requestAnimationFrame(gameLoop);
+}
 
-  document.getElementById('btn-pause').addEventListener('click', () => {
-    paused = !paused;
-    const btn = document.getElementById('btn-pause');
-    btn.classList.toggle('pause-active', paused);
-    btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
-    if (paused) {
-      overlay.classList.remove('hidden');
-      countdownEl.textContent = '⏸';
-      overlayMsg.textContent = 'PAUSED';
-    } else {
-      overlay.classList.add('hidden');
-    }
-  });
+function update(dt) {
+  // Clubs update
+  club[0].update(dt, club[1]);
+  club[1].update(dt, club[0]);
 
-  // Init
-  bindDevInputs();
-  resize();
-  gameActive = true;
-  animId = requestAnimationFrame(loop);
+  // Ball physics
+  ball.vy += vh(C.G) * dt;
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
 
-  window.addEventListener('resize', () => {
-    cancelAnimationFrame(animId);
-    lastTime = null;
-    resize();
-    gameActive = true;
-    animId = requestAnimationFrame(loop);
-  });
+  // Collisions
+  ballGroundCollision();
+  ballNetCollision();
+  ballClubCollision(club[0]);
+  ballClubCollision(club[1]);
+  checkOutOfBounds();
+}
 
-  // Prevent arrow key scroll
-  window.addEventListener('keydown', e => {
-    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
-      e.preventDefault();
-    }
-  });
+// ─── DRAW ────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,W,H);
 
-})();
+  // Background
+  ctx.fillStyle = '#0a0c0a';
+  ctx.fillRect(0,0,W,H);
+
+  // Subtle grid
+  ctx.strokeStyle = '#1a1e1a';
+  ctx.lineWidth = 0.5;
+  const gs = 40;
+  for(let x=0;x<W;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  // Ground
+  ctx.fillStyle = '#1a2e1a';
+  ctx.fillRect(0, H-3, W, 3);
+  ctx.strokeStyle = '#39ff14';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, H-3);
+  ctx.lineTo(W, H-3);
+  ctx.stroke();
+
+  // Net
+  const netX = getNetX();
+  const netTop = H - vh(NET_HEIGHT_VH);
+  // Net post
+  ctx.fillStyle = '#2a3a2a';
+  ctx.fillRect(netX - NET_THICKNESS/2, netTop, NET_THICKNESS, H - netTop);
+  // Net lines
+  ctx.strokeStyle = '#39ff1460';
+  ctx.lineWidth = 1;
+  for(let y=netTop; y<H; y+=8) {
+    ctx.beginPath();
+    ctx.moveTo(netX - NET_THICKNESS/2, y);
+    ctx.lineTo(netX + NET_THICKNESS/2, y);
+    ctx.stroke();
+  }
+  // Net top cap
+  ctx.fillStyle = '#39ff14';
+  ctx.fillRect(netX - NET_THICKNESS/2 - 2, netTop - 3, NET_THICKNESS + 4, 3);
+
+  // Clubs
+  club[0].draw(activeClub === 0);
+  club[1].draw(activeClub === 1);
+
+  // Ball
+  drawBall();
+
+  // Pause overlay
+  if(paused) {
+    ctx.fillStyle = '#0008';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#39ff14';
+    ctx.font = `bold ${vh(6)}px Orbitron, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W/2, H/2);
+    ctx.textAlign = 'left';
+  }
+
+  // Countdown overlay
+  if(countdownActive) {
+    ctx.fillStyle = '#000a';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#ff6b1a';
+    ctx.font = `bold ${vh(5)}px Orbitron, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`RESTART IN ${Math.ceil(restartTimer)}`, W/2, H/2);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawBall() {
+  const r = vw(C.BALL_RAD);
+  const x = ball.x, y = ball.y;
+
+  // Glow
+  const grd = ctx.createRadialGradient(x,y,0,x,y,r*2);
+  grd.addColorStop(0, '#ffffff40');
+  grd.addColorStop(1, '#ffffff00');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(x, y, r*2, 0, Math.PI*2);
+  ctx.fill();
+
+  // Ball body
+  const ballGrd = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.1, x, y, r);
+  ballGrd.addColorStop(0, '#e8f0ff');
+  ballGrd.addColorStop(0.4, '#c0d0e8');
+  ballGrd.addColorStop(1, '#607090');
+  ctx.fillStyle = ballGrd;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffffff30';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Ball seam
+  ctx.strokeStyle = '#80a0c080';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.85, 0.3, Math.PI + 0.3);
+  ctx.stroke();
+}
+
+// ─── BUTTONS ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-restart').addEventListener('click', () => {
+  countdownActive = false;
+  resetGame();
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? '▶ RESUME' : '⏸ PAUSE';
+  lastTime = null;
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+resize();
+resetGame();
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
