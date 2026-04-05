@@ -1,0 +1,66 @@
+
+
+please create following html game:
+
+
+ OVERVIEW 
+---------
+a simple 2d game in which the heros move around, trying to catch prey objects and escape enemy objects. 
+
+DEFINITIONS
+-----------
+*4 main direction: up, down, left, right. 
+*gamefield - the 2d space on which the game takes plase 
+
+
+WORLD
+-----
+a single screen, nothting exists out of it. camera is fixed in top prespective
+
+OBJECTS
+-------
+AGENSTS: 2 agenst are moving around the game field, controlled by the user. at any given time there is one active agent that is conrolled by the keybaord. he moves around in any of the 4 main directions,  with the arrow keys  the active agent is somewhat brighher to indicate it. they move around at the speed of AGENTS_SPEED = 8vw/sec.
+ agenst are graphically represeneted as simple, diamond like  objects. 
+
+switching agents: the TAB key will switch agents as follows: a combination of TAB and one of the arrow keys will make the agent that has now lost control of the keyboard continue traveling in the same direction of the arrow independently, at the same constant speed. if the TAB is pressed with no other key, the agent the lost keyboard control will remain still until it gains keyboard control again. 
+
+ENEMIES: are dynamic objects, can move in the 4 main directions. represented by a hollow circle. the game begins with NUMBER_OF_ENEMIES = 3, they move around at the speed of ENM_SPD = 3 vw/sec. 
+PREY: are dynamic, objects, can move in the 4 main directions. they are represented by a @ sign. the game begins with NUMBER_OF_RPEYS = 3, hey move around at the speed of PRY_SPD = 3 vw/sec
+
+
+MOVEMENT
+--------
+these simple alorighms define a dirction of movements. the speed is defined by ENM_SPD, PRY_SPD, respectevily
+
+-"away1" mode:
+*find agentC, the closest agent
+*find boundC, the closest gamefield boundary
+* if the agentC is closer than the boundC: 
+	choose the direction the makes maximzes distance agentC
+else:
+	choose the direction that maximizes distance to boundC 
+
+
+
+-"catch1" mode:
+*find the closest agent
+*choose the direction (of the 4 main directions) that will minimize distance to that agent
+
+
+
+GAME PLAY
+----------
+enemy objects move in the "catch1" mode. 
+prey objects move in the "away1"
+if enemy object catches an agent, the agent is gone
+if an agent catche a prey, that prey object is gone. 
+
+
+
+GUI 
+---
+the maim game field is in the center of the screen, 70vw wide, 80vh high. on the right side of the screen there is a panel with buttong for STOP, RESUME, RESTART. 
+on the right side there is a dev panel to configure the constants: AGENTS_SPEED, NUMBER_OF_ENEMIES, ENM_SPD, NUMBER_OF_RPEYS, PRY_SPD
+
+color scheme: background in black to dark gray tones. agents objects are in tones blue. prey objects are yellow. enemy objects are red.  
+

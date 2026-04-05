@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Hunt 2D</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        canvas {
+            background-color: #000;
+            border: 2px solid #444;
+            width: 70vw;
+            height: 80vh;
+        }
+
+        #ui-panel {
+            width: 250px;
+            background-color: #2a2a2a;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-left: 2px solid #444;
+            overflow-y: auto;
+        }
+
+        .section {
+            border-bottom: 1px solid #444;
+            padding-bottom: 15px;
+        }
+
+        h3 { margin-top: 0; color: #aaa; font-size: 0.9rem; text-transform: uppercase; }
+
+        .controls button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        .controls button:hover { background: #555; }
+
+        .dev-panel label {
+            display: block;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+
+        .dev-panel input {
+            width: 100%;
+            background: #111;
+            border: 1px solid #555;
+            color: #0f0;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        #status { font-weight: bold; color: #3498db; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<div id="ui-panel">
+    <div class="section controls">
+        <h3>Game Controls</h3>
+        <button onclick="toggleGame(false)">STOP</button>
+        <button onclick="toggleGame(true)">RESUME</button>
+        <button onclick="initGame()">RESTART</button>
+        <p>Active: <span id="status">Agent 1</span></p>
+    </div>
+
+    <div class="section dev-panel">
+        <h3>Configuration</h3>
+        <label>AGENTS_SPEED (vw/s)</label>
+        <input type="number" id="cfg_agt_spd" value="8" step="0.5">
+        
+        <label>ENEMIES (Count)</label>
+        <input type="number" id="cfg_enm_count" value="3">
+        
+        <label>ENM_SPD (vw/s)</label>
+        <input type="number" id="cfg_enm_spd" value="3" step="0.5">
+        
+        <label>PREYS (Count)</label>
+        <input type="number" id="cfg_pry_count" value="3">
+        
+        <label>PRY_SPD (vw/s)</label>
+        <input type="number" id="cfg_pry_spd" value="3" step="0.5">
+    </div>
+</div>
+
+<script>
+/** @type {HTMLCanvasElement} */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game State
+let agents = [];
+let enemies = [];
+let preys = [];
+let activeIdx = 0;
+let isRunning = true;
+let lastTime = 0;
+let keys = {};
+
+// Viewport conversion helper (based on 70vw canvas width)
+function vwToPx(vw) {
+    return (vw * window.innerWidth / 100);
+}
+
+class Entity {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = 0;
+        this.vy = 0;
+        this.size = 20;
+    }
+
+    update(dt, speed) {
+        this.x += this.vx * speed * dt;
+        this.y += this.vy * speed * dt;
+
+        // Keep in bounds
+        this.x = Math.max(this.size, Math.min(canvas.width - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(canvas.height - this.size, this.y));
+    }
+
+    getDist(target) {
+        return Math.hypot(this.x - target.x, this.y - target.y);
+    }
+}
+
+class Agent extends Entity {
+    draw(isActive) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = isActive ? '#00d4ff' : '#005577';
+        ctx.shadowBlur = isActive ? 15 : 0;
+        ctx.shadowColor = '#00d4ff';
+        ctx.beginPath();
+        ctx.moveTo(0, -this.size);
+        ctx.lineTo(this.size, 0);
+        ctx.lineTo(0, this.size);
+        ctx.lineTo(-this.size, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+function initGame() {
+    // Set internal resolution
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+
+    const enmCount = parseInt(document.getElementById('cfg_enm_count').value);
+    const pryCount = parseInt(document.getElementById('cfg_pry_count').value);
+
+    agents = [
+        new Agent(canvas.width * 0.25, canvas.height / 2, '#3498db'),
+        new Agent(canvas.width * 0.75, canvas.height / 2, '#3498db')
+    ];
+    activeIdx = 0;
+
+    enemies = Array.from({length: enmCount}, () => 
+        new Entity(Math.random() * canvas.width, Math.random() * canvas.height, '#ff4757'));
+    
+    preys = Array.from({length: pryCount}, () => 
+        new Entity(Math.random() * canvas.width, Math.random() * canvas.height, '#eaffd0'));
+
+    isRunning = true;
+    requestAnimationFrame(gameLoop);
+}
+
+function handleInput() {
+    const active = agents[activeIdx];
+    if (!active) return;
+
+    active.vx = 0;
+    active.vy = 0;
+
+    if (keys['ArrowUp']) active.vy = -1;
+    if (keys['ArrowDown']) active.vy = 1;
+    if (keys['ArrowLeft']) active.vx = -1;
+    if (keys['ArrowRight']) active.vx = 1;
+}
+
+// Logic: Away1 & Catch1
+function getDirection(entity, mode) {
+    const directions = [
+        {x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}
+    ];
+
+    const targetAgent = agents.reduce((prev, curr) => 
+        entity.getDist(curr) < entity.getDist(prev) ? curr : prev, agents[0]);
+
+    if (!targetAgent) return {x: 0, y: 0};
+
+    if (mode === 'catch') {
+        return directions.sort((a, b) => {
+            const d1 = Math.hypot((entity.x + a.x) - targetAgent.x, (entity.y + a.y) - targetAgent.y);
+            const d2 = Math.hypot((entity.x + b.x) - targetAgent.x, (entity.y + b.y) - targetAgent.y);
+            return d1 - d2;
+        })[0];
+    } else {
+        // Away Mode
+        const distToAgent = entity.getDist(targetAgent);
+        const distToBound = Math.min(entity.x, canvas.width - entity.x, entity.y, canvas.height - entity.y);
+
+        if (distToAgent < distToBound) {
+            // Maximize distance to agent
+            return directions.sort((a, b) => {
+                const d1 = Math.hypot((entity.x + a.x) - targetAgent.x, (entity.y + a.y) - targetAgent.y);
+                const d2 = Math.hypot((entity.x + b.x) - targetAgent.x, (entity.y + b.y) - targetAgent.y);
+                return d2 - d1;
+            })[0];
+        } else {
+            // Maximize distance to boundary
+            return directions.sort((a, b) => {
+                const b1 = Math.min(entity.x + a.x, canvas.width - (entity.x + a.x), entity.y + a.y, canvas.height - (entity.y + a.y));
+                const b2 = Math.min(entity.x + b.x, canvas.width - (entity.x + b.x), entity.y + b.y, canvas.height - (entity.y + b.y));
+                return b2 - b1;
+            })[0];
+        }
+    }
+}
+
+function gameLoop(time) {
+    if (!isRunning) return;
+    const dt = (time - lastTime) / 1000;
+    lastTime = time;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const agtSpd = vwToPx(parseFloat(document.getElementById('cfg_agt_spd').value));
+    const enmSpd = vwToPx(parseFloat(document.getElementById('cfg_enm_spd').value));
+    const prySpd = vwToPx(parseFloat(document.getElementById('cfg_pry_spd').value));
+
+    handleInput();
+
+    // Update Agents
+    agents.forEach((a, i) => {
+        a.update(dt, agtSpd);
+        a.draw(i === activeIdx);
+    });
+
+    // Update Preys (Away1)
+    preys.forEach((p, idx) => {
+        const dir = getDirection(p, 'away');
+        p.vx = dir.x; p.vy = dir.y;
+        p.update(dt, prySpd);
+        
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = '24px Arial';
+        ctx.fillText('@', p.x - 10, p.y + 8);
+
+        // Check Collision with Agents
+        agents.forEach(a => {
+            if (p.getDist(a) < 20) preys.splice(idx, 1);
+        });
+    });
+
+    // Update Enemies (Catch1)
+    enemies.forEach((e, idx) => {
+        const dir = getDirection(e, 'catch');
+        e.vx = dir.x; e.vy = dir.y;
+        e.update(dt, enmSpd);
+
+        ctx.strokeStyle = '#ff4757';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 15, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Check Collision with Agents
+        agents.forEach((a, aIdx) => {
+            if (e.getDist(a) < 25) {
+                agents.splice(aIdx, 1);
+                if (activeIdx >= agents.length) activeIdx = 0;
+                document.getElementById('status').innerText = agents.length > 0 ? `Agent ${activeIdx + 1}` : "GAME OVER";
+            }
+        });
+    });
+
+    if (agents.length > 0) requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const oldActive = agents[activeIdx];
+        
+        // Find direction if an arrow key is held during Tab
+        let vx = 0, vy = 0;
+        if (keys['ArrowUp']) vy = -1;
+        if (keys['ArrowDown']) vy = 1;
+        if (keys['ArrowLeft']) vx = -1;
+        if (keys['ArrowRight']) vx = 1;
+
+        if (oldActive) {
+            oldActive.vx = vx;
+            oldActive.vy = vy;
+        }
+
+        activeIdx = (activeIdx + 1) % agents.length;
+        document.getElementById('status').innerText = `Agent ${activeIdx + 1}`;
+    }
+});
+
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+function toggleGame(state) {
+    isRunning = state;
+    if (state) {
+        lastTime = performance.now();
+        gameLoop(lastTime);
+    }
+}
+
+// Start
+initGame();
+</script>
+</body>
+</html>
