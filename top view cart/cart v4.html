@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Top-Down Vehicle</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #1b1d22;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  #wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  canvas {
+    background: #2c2f36;
+    border: 2px solid #4a4d55;
+    border-radius: 6px;
+    display: block;
+  }
+  canvas.edit-cursor { cursor: crosshair; }
+  canvas.drive-cursor { cursor: default; }
+
+  /* ---- bottom bar (hud + editor toolbar, same row) ---- */
+  #bottombar {
+    width: 900px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: #9aa0aa;
+    min-height: 30px;
+  }
+  #hud { display: flex; gap: 20px; align-items: center; }
+  #hud b { color: #e3e6ea; }
+
+  #editorbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+  }
+  #editorbar.visible { display: flex; }
+
+  .key {
+    display: inline-block;
+    border: 1px solid #5a5e68;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: 0 2px;
+    background: #3a3d45;
+    color: #d6d9de;
+    font-size: 12px;
+  }
+
+  /* mode badge */
+  #modebadge {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    background: #3a3d45;
+    color: #9aa0aa;
+    border: 1px solid #5a5e68;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  #modebadge.edit { background: #f2cc8f; color: #1b1d22; border-color: #c9a84c; }
+
+  /* color swatches */
+  #swatches { display: flex; gap: 5px; align-items: center; }
+  .swatch {
+    width: 20px; height: 20px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.1s, transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: #fff; }
+
+  /* custom color picker */
+  #colorPickerWrap { display: flex; align-items: center; gap: 5px; }
+  #colorPicker {
+    width: 22px; height: 22px;
+    border: none; padding: 0;
+    background: none;
+    cursor: pointer;
+    border-radius: 3px;
+    border: 2px solid transparent;
+  }
+  #colorPicker.active { border-color: #fff; }
+
+  /* export / delete hint */
+  #exportBtn {
+    margin-left: auto;
+    padding: 3px 12px;
+    border-radius: 4px;
+    border: 1px solid #5a5e68;
+    background: #3a3d45;
+    color: #d6d9de;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  #exportBtn:hover { background: #4a4d55; }
+  #exportBtn.copied { background: #6a994e; color: #fff; border-color: #6a994e; }
+
+  #editorhint {
+    font-size: 11px;
+    color: #5a5e68;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="900" height="600" class="drive-cursor"></canvas>
+
+  <div id="bottombar">
+    <!-- always visible: mode badge + drive hud -->
+    <div id="modebadge">DRIVE</div>
+    <div id="hud">
+      <div><span class="key">E</span> toggle edit mode</div>
+      <div><span class="key">↑</span><span class="key">↓</span> drive &nbsp; <span class="key">←</span><span class="key">→</span> steer</div>
+      <div>speed: <b id="speedVal">0.0</b></div>
+      <div>steer: <b id="steerVal">0°</b></div>
+    </div>
+
+    <!-- editor-only controls -->
+    <div id="editorbar">
+      <div id="swatches"></div>
+      <div id="colorPickerWrap">
+        <input type="color" id="colorPicker" value="#888888" title="Custom color">
+      </div>
+      <div id="editorhint">drag to draw &nbsp;·&nbsp; click existing to delete</div>
+      <button id="exportBtn">Copy JSON</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // ---------- Vehicle parameters ----------
+  const BODY_LENGTH   = 70;
+  const TRACK_WIDTH   = 44;
+  const WHEEL_LENGTH  = 18;
+  const WHEEL_WIDTH   = 7;
+  const MAX_STEER_DEG = 38;
+  const STEER_RATE    = 110;
+  const STEER_RETURN  = 140;
+  const MAX_SPEED     = 180;
+  const MAX_REVERSE   = -90;
+  const ACCEL         = 140;
+  const DECEL         = 220;
+  const FRICTION      = 90;
+
+  // ---------- Vehicle state ----------
+  const car = {
+    x: W / 2,
+    y: H / 2,
+    heading: -Math.PI / 2,
+    speed: 0,
+    steerAngle: 0
+  };
+
+  const CAR_COLLISION_RADIUS = Math.hypot(BODY_LENGTH / 2 + WHEEL_LENGTH / 2, TRACK_WIDTH / 2);
+
+  // ---------- Structures ----------
+  // Each entry: { x, y, length, width, color }
+  // x, y = top-left corner; length = horizontal extent; width = vertical extent
+  const STRUCTURES = [
+    { x: 120, y: 100, length: 90,  width: 50,  color: '#e07a5f' },
+    { x: 300, y: 80,  length: 60,  width: 90,  color: '#81b29a' },
+    { x: 480, y: 130, length: 100, width: 40,  color: '#f2cc8f' },
+    { x: 680, y: 90,  length: 50,  width: 70,  color: '#3d5a80' },
+    { x: 760, y: 220, length: 70,  width: 70,  color: '#9b5de5' },
+    { x: 90,  y: 300, length: 40,  width: 100, color: '#f15bb5' },
+    { x: 220, y: 350, length: 80,  width: 60,  color: '#00bbf9' },
+    { x: 420, y: 380, length: 100, width: 50,  color: '#fee440' },
+    { x: 600, y: 350, length: 60,  width: 90,  color: '#c1121f' },
+    { x: 760, y: 420, length: 50,  width: 60,  color: '#6a994e' },
+    { x: 150, y: 470, length: 70,  width: 40,  color: '#e07a5f' },
+    { x: 340, y: 480, length: 50,  width: 70,  color: '#81b29a' },
+    { x: 520, y: 470, length: 90,  width: 50,  color: '#3d5a80' },
+    { x: 60,  y: 200, length: 50,  width: 50,  color: '#9b5de5' }
+  ];
+
+  // ---------- Editor state ----------
+  const PALETTE = ['#e07a5f','#81b29a','#f2cc8f','#3d5a80','#9b5de5','#f15bb5','#00bbf9','#fee440','#c1121f','#6a994e'];
+  let editMode = false;
+  let activeColor = PALETTE[0];
+  let useCustomColor = false;
+  let dragStart = null;   // { x, y } in canvas coords
+  let dragCurrent = null; // { x, y }
+  const MIN_RECT_SIZE = 8; // px — minimum draw size to count as a rectangle
+
+  // ---------- UI: build swatches ----------
+  const swatchContainer = document.getElementById('swatches');
+  PALETTE.forEach(col => {
+    const div = document.createElement('div');
+    div.className = 'swatch' + (col === activeColor ? ' active' : '');
+    div.style.background = col;
+    div.addEventListener('click', () => {
+      activeColor = col;
+      useCustomColor = false;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      div.classList.add('active');
+      document.getElementById('colorPicker').classList.remove('active');
+    });
+    swatchContainer.appendChild(div);
+  });
+
+  // custom color picker
+  const colorPicker = document.getElementById('colorPicker');
+  colorPicker.addEventListener('input', () => {
+    activeColor = colorPicker.value;
+    useCustomColor = true;
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    colorPicker.classList.add('active');
+  });
+
+  // export button
+  const exportBtn = document.getElementById('exportBtn');
+  exportBtn.addEventListener('click', () => {
+    const json = 'const STRUCTURES = [\n' +
+      STRUCTURES.map(s =>
+        `  { x: ${Math.round(s.x)}, y: ${Math.round(s.y)}, length: ${Math.round(s.length)}, width: ${Math.round(s.width)}, color: '${s.color}' }`
+      ).join(',\n') +
+      '\n];';
+    navigator.clipboard.writeText(json).then(() => {
+      exportBtn.textContent = 'Copied!';
+      exportBtn.classList.add('copied');
+      setTimeout(() => { exportBtn.textContent = 'Copy JSON'; exportBtn.classList.remove('copied'); }, 1800);
+    });
+  });
+
+  // ---------- Mode toggle ----------
+  function setMode(edit) {
+    editMode = edit;
+    const badge = document.getElementById('modebadge');
+    const bar   = document.getElementById('editorbar');
+    const hud   = document.getElementById('hud');
+    if (edit) {
+      badge.textContent = 'EDIT';
+      badge.classList.add('edit');
+      bar.classList.add('visible');
+      canvas.classList.remove('drive-cursor');
+      canvas.classList.add('edit-cursor');
+      // stop the car
+      car.speed = 0;
+    } else {
+      badge.textContent = 'DRIVE';
+      badge.classList.remove('edit');
+      bar.classList.remove('visible');
+      canvas.classList.add('drive-cursor');
+      canvas.classList.remove('edit-cursor');
+      dragStart = null; dragCurrent = null;
+    }
+  }
+
+  // ---------- Input ----------
+  const keys = { up: false, down: false, left: false, right: false };
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'e' || e.key === 'E') { setMode(!editMode); return; }
+    if (editMode) return;
+    switch (e.key) {
+      case 'ArrowUp':    keys.up    = true; e.preventDefault(); break;
+      case 'ArrowDown':  keys.down  = true; e.preventDefault(); break;
+      case 'ArrowLeft':  keys.left  = true; e.preventDefault(); break;
+      case 'ArrowRight': keys.right = true; e.preventDefault(); break;
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (editMode) return;
+    switch (e.key) {
+      case 'ArrowUp':    keys.up    = false; e.preventDefault(); break;
+      case 'ArrowDown':  keys.down  = false; e.preventDefault(); break;
+      case 'ArrowLeft':  keys.left  = false; e.preventDefault(); break;
+      case 'ArrowRight': keys.right = false; e.preventDefault(); break;
+    }
+  });
+
+  // ---------- Canvas mouse: editor ----------
+  function canvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function rectFromDrag(a, b) {
+    return {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      length: Math.abs(b.x - a.x),
+      width:  Math.abs(b.y - a.y)
+    };
+  }
+
+  function hitTest(px, py) {
+    // returns index of the topmost structure containing (px, py), or -1
+    for (let i = STRUCTURES.length - 1; i >= 0; i--) {
+      const s = STRUCTURES[i];
+      if (px >= s.x && px <= s.x + s.length && py >= s.y && py <= s.y + s.width) return i;
+    }
+    return -1;
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (!editMode) return;
+    const p = canvasPos(e);
+    // check if clicking an existing structure (to delete)
+    const hit = hitTest(p.x, p.y);
+    if (hit !== -1) {
+      // will decide on mouseup whether this was a click (no drag) or a misfire
+      dragStart = p;
+      dragCurrent = p;
+      dragStart._hitIndex = hit; // tentatively a delete
+    } else {
+      dragStart = p;
+      dragCurrent = p;
+      dragStart._hitIndex = -1;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!editMode || !dragStart) return;
+    dragCurrent = canvasPos(e);
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!editMode || !dragStart) return;
+    const p = canvasPos(e);
+    const r = rectFromDrag(dragStart, p);
+
+    if (r.length < MIN_RECT_SIZE && r.width < MIN_RECT_SIZE) {
+      // treat as a click: delete if hit
+      if (dragStart._hitIndex !== -1) {
+        STRUCTURES.splice(dragStart._hitIndex, 1);
+      }
+    } else {
+      // treat as a drag: add new rectangle
+      STRUCTURES.push({ x: r.x, y: r.y, length: r.length, width: r.width, color: activeColor });
+    }
+    dragStart = null;
+    dragCurrent = null;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    dragStart = null; dragCurrent = null;
+  });
+
+  // ---------- Update (drive mode only) ----------
+  let lastTime = null;
+
+  function update(dt) {
+    if (editMode) return;
+
+    if (keys.left && !keys.right) {
+      car.steerAngle -= STEER_RATE * dt;
+    } else if (keys.right && !keys.left) {
+      car.steerAngle += STEER_RATE * dt;
+    } else {
+      if (car.steerAngle > 0) car.steerAngle = Math.max(0, car.steerAngle - STEER_RETURN * dt);
+      else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + STEER_RETURN * dt);
+    }
+    car.steerAngle = Math.max(-MAX_STEER_DEG, Math.min(MAX_STEER_DEG, car.steerAngle));
+
+    if (keys.up && !keys.down) {
+      car.speed += ACCEL * dt;
+    } else if (keys.down && !keys.up) {
+      car.speed -= DECEL * dt;
+    } else {
+      if (car.speed > 0) car.speed = Math.max(0, car.speed - FRICTION * dt);
+      else if (car.speed < 0) car.speed = Math.min(0, car.speed + FRICTION * dt);
+    }
+    car.speed = Math.max(MAX_REVERSE, Math.min(MAX_SPEED, car.speed));
+
+    if (Math.abs(car.speed) > 0.01) {
+      const steerRad = car.steerAngle * Math.PI / 180;
+      const rearX = car.x - Math.cos(car.heading) * (BODY_LENGTH / 2);
+      const rearY = car.y - Math.sin(car.heading) * (BODY_LENGTH / 2);
+      const newRearX = rearX + Math.cos(car.heading) * car.speed * dt;
+      const newRearY = rearY + Math.sin(car.heading) * car.speed * dt;
+      car.heading += (car.speed / BODY_LENGTH) * Math.tan(steerRad) * dt;
+      car.x = newRearX + Math.cos(car.heading) * (BODY_LENGTH / 2);
+      car.y = newRearY + Math.sin(car.heading) * (BODY_LENGTH / 2);
+    }
+
+    const margin = BODY_LENGTH;
+    if (car.x < margin)     { car.x = margin;     car.speed = 0; }
+    if (car.x > W - margin) { car.x = W - margin; car.speed = 0; }
+    if (car.y < margin)     { car.y = margin;      car.speed = 0; }
+    if (car.y > H - margin) { car.y = H - margin;  car.speed = 0; }
+
+    for (const s of STRUCTURES) {
+      const closestX = Math.max(s.x, Math.min(car.x, s.x + s.length));
+      const closestY = Math.max(s.y, Math.min(car.y, s.y + s.width));
+      const dx = car.x - closestX;
+      const dy = car.y - closestY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < CAR_COLLISION_RADIUS * CAR_COLLISION_RADIUS) {
+        const dist = Math.sqrt(distSq);
+        if (dist > 0.0001) {
+          const overlap = CAR_COLLISION_RADIUS - dist;
+          car.x += (dx / dist) * overlap;
+          car.y += (dy / dist) * overlap;
+        } else {
+          car.x += CAR_COLLISION_RADIUS;
+        }
+        car.speed = 0;
+      }
+    }
+  }
+
+  // ---------- Drawing ----------
+  function drawRectAt(cx, cy, angle, length, width, fillStyle, strokeStyle) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.fillStyle = fillStyle;
+    if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.lineWidth = 1.5; }
+    ctx.beginPath();
+    ctx.rect(-length / 2, -width / 2, length, width);
+    ctx.fill();
+    if (strokeStyle) ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCar() {
+    const halfBody  = BODY_LENGTH / 2;
+    const halfTrack = TRACK_WIDTH / 2;
+    const cosH = Math.cos(car.heading);
+    const sinH = Math.sin(car.heading);
+    const perpX = -sinH, perpY = cosH;
+
+    const frontCenterX = car.x + cosH * halfBody;
+    const frontCenterY = car.y + sinH * halfBody;
+    const rearCenterX  = car.x - cosH * halfBody;
+    const rearCenterY  = car.y - sinH * halfBody;
+
+    ctx.save();
+    ctx.strokeStyle = '#6fd1ff';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(rearCenterX, rearCenterY);
+    ctx.lineTo(frontCenterX, frontCenterY);
+    ctx.stroke();
+    ctx.restore();
+
+    drawRectAt(rearCenterX,  rearCenterY,  car.heading + Math.PI / 2, TRACK_WIDTH, 3, '#3d4250', null);
+    drawRectAt(frontCenterX, frontCenterY, car.heading + Math.PI / 2, TRACK_WIDTH, 3, '#3d4250', null);
+
+    const rearLeftX  = rearCenterX  + perpX * halfTrack;
+    const rearLeftY  = rearCenterY  + perpY * halfTrack;
+    const rearRightX = rearCenterX  - perpX * halfTrack;
+    const rearRightY = rearCenterY  - perpY * halfTrack;
+    drawRectAt(rearLeftX,  rearLeftY,  car.heading, WHEEL_LENGTH, WHEEL_WIDTH, '#1c1e22', '#000');
+    drawRectAt(rearRightX, rearRightY, car.heading, WHEEL_LENGTH, WHEEL_WIDTH, '#1c1e22', '#000');
+
+    const steerRad = car.steerAngle * Math.PI / 180;
+    const frontWheelAngle = car.heading + steerRad;
+    const frontLeftX  = frontCenterX + perpX * halfTrack;
+    const frontLeftY  = frontCenterY + perpY * halfTrack;
+    const frontRightX = frontCenterX - perpX * halfTrack;
+    const frontRightY = frontCenterY - perpY * halfTrack;
+    drawRectAt(frontLeftX,  frontLeftY,  frontWheelAngle, WHEEL_LENGTH, WHEEL_WIDTH, '#ffb454', '#000');
+    drawRectAt(frontRightX, frontRightY, frontWheelAngle, WHEEL_LENGTH, WHEEL_WIDTH, '#ffb454', '#000');
+
+    ctx.save();
+    ctx.fillStyle = '#6fd1ff';
+    ctx.beginPath();
+    ctx.arc(frontCenterX, frontCenterY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStructures() {
+    ctx.save();
+    for (const s of STRUCTURES) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x, s.y, s.length, s.width);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(s.x, s.y, s.length, s.width);
+    }
+
+    // highlight hovered structure in edit mode
+    if (editMode && !dragStart) {
+      // we'd need mouse position — track it
+    }
+
+    // draw the in-progress rectangle while dragging
+    if (editMode && dragStart && dragCurrent) {
+      const r = rectFromDrag(dragStart, dragCurrent);
+      if (r.length >= MIN_RECT_SIZE || r.width >= MIN_RECT_SIZE) {
+        ctx.fillStyle = activeColor;
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(r.x, r.y, r.length, r.width);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(r.x, r.y, r.length, r.width);
+        ctx.setLineDash([]);
+        // size label
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px Segoe UI, Arial, sans-serif';
+        ctx.fillText(`${Math.round(r.length)} × ${Math.round(r.width)}`, r.x + 4, r.y + 13);
+      }
+    }
+    ctx.restore();
+  }
+
+  // hover tracking for delete highlight
+  let hoverIdx = -1;
+  canvas.addEventListener('mousemove', (e) => {
+    if (!editMode) return;
+    const p = canvasPos(e);
+    hoverIdx = hitTest(p.x, p.y);
+  });
+
+  function drawHover() {
+    if (!editMode || dragStart || hoverIdx === -1) return;
+    const s = STRUCTURES[hoverIdx];
+    ctx.save();
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(s.x, s.y, s.length, s.width);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,68,68,0.12)';
+    ctx.fillRect(s.x, s.y, s.length, s.width);
+    ctx.restore();
+  }
+
+  function drawWorld() {
+    ctx.clearRect(0, 0, W, H);
+
+    // grid
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    const grid = 40;
+    for (let gx = 0; gx <= W; gx += grid) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy = 0; gy <= H; gy += grid) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+    ctx.restore();
+
+    drawStructures();
+    drawHover();
+    drawCar();
+
+    // edit mode overlay label
+    if (editMode) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(242,204,143,0.10)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+
+  function updateHud() {
+    document.getElementById('speedVal').textContent = car.speed.toFixed(1);
+    document.getElementById('steerVal').textContent = Math.round(car.steerAngle) + '°';
+  }
+
+  // ---------- Main loop ----------
+  function frame(timestamp) {
+    if (lastTime === null) lastTime = timestamp;
+    let dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    lastTime = timestamp;
+    update(dt);
+    drawWorld();
+    updateHud();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
