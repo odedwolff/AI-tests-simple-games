@@ -347,9 +347,13 @@
   }
 
   function isOnCar(px, py) {
+    // approximate with the OBB half-diagonal for the click guard
+    const hL = (BODY_LENGTH + WHEEL_LENGTH) / 2;
+    const hW = TRACK_WIDTH / 2 + WHEEL_WIDTH / 2;
+    const r = Math.hypot(hL, hW);
     const dx = px - car.x;
     const dy = py - car.y;
-    return dx * dx + dy * dy < CAR_COLLISION_RADIUS * CAR_COLLISION_RADIUS;
+    return dx * dx + dy * dy < r * r;
   }
 
   canvas.addEventListener('mousedown', (e) => {
@@ -431,21 +435,65 @@
     if (car.y < margin)     { car.y = margin;      car.speed = 0; }
     if (car.y > H - margin) { car.y = H - margin;  car.speed = 0; }
 
+    // OBB (car) vs AABB (structure) collision via Separating Axis Theorem.
+    // Car box: half-extents hL (along heading) x hW (perpendicular), centered at car.x/y.
+    // We test 4 axes: car's local x/y axes, and structure's x/y axes (world-aligned).
+    // On overlap, push out along the axis of minimum penetration.
+    const hL = (BODY_LENGTH + WHEEL_LENGTH) / 2;  // half-length along heading
+    const hW = TRACK_WIDTH / 2 + WHEEL_WIDTH / 2; // half-width across heading
+
+    const cosH = Math.cos(car.heading);
+    const sinH = Math.sin(car.heading);
+
     for (const s of STRUCTURES) {
-      const closestX = Math.max(s.x, Math.min(car.x, s.x + s.length));
-      const closestY = Math.max(s.y, Math.min(car.y, s.y + s.width));
-      const dx = car.x - closestX;
-      const dy = car.y - closestY;
-      const distSq = dx * dx + dy * dy;
-      if (distSq < CAR_COLLISION_RADIUS * CAR_COLLISION_RADIUS) {
-        const dist = Math.sqrt(distSq);
-        if (dist > 0.0001) {
-          const overlap = CAR_COLLISION_RADIUS - dist;
-          car.x += (dx / dist) * overlap;
-          car.y += (dy / dist) * overlap;
-        } else {
-          car.x += CAR_COLLISION_RADIUS;
+      // Structure center and half-extents
+      const scx = s.x + s.length / 2;
+      const scy = s.y + s.width  / 2;
+      const shL = s.length / 2;
+      const shW = s.width  / 2;
+
+      // Vector from structure center to car center
+      const dx = car.x - scx;
+      const dy = car.y - scy;
+
+      // 4 candidate separating axes:
+      // A0, A1 = car's local axes (heading and perpendicular)
+      // A2, A3 = world X and Y (structure axes)
+      const axes = [
+        { x: cosH,  y: sinH  },  // car forward
+        { x: -sinH, y: cosH  },  // car sideways
+        { x: 1,     y: 0     },  // world X
+        { x: 0,     y: 1     },  // world Y
+      ];
+
+      let minPen = Infinity;
+      let pushX = 0, pushY = 0;
+      let separated = false;
+
+      for (const ax of axes) {
+        // Project car OBB onto axis: sum of |corner projections| = |hL*(ax·carFwd)| + |hW*(ax·carSide)|
+        const carProj = Math.abs(hL * (ax.x * cosH  + ax.y * sinH)) +
+                        Math.abs(hW * (ax.x * (-sinH) + ax.y * cosH));
+        // Project structure AABB onto axis
+        const strProj = Math.abs(shL * ax.x) + Math.abs(shW * ax.y);
+        // Distance between centers along axis
+        const dist = Math.abs(dx * ax.x + dy * ax.y);
+        const pen = carProj + strProj - dist;
+
+        if (pen <= 0) { separated = true; break; }  // gap on this axis → no collision
+
+        if (pen < minPen) {
+          minPen = pen;
+          // push direction: away from structure center toward car center
+          const sign = (dx * ax.x + dy * ax.y) >= 0 ? 1 : -1;
+          pushX = ax.x * sign;
+          pushY = ax.y * sign;
         }
+      }
+
+      if (!separated) {
+        car.x += pushX * minPen;
+        car.y += pushY * minPen;
         car.speed = 0;
       }
     }
