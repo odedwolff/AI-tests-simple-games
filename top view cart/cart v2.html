@@ -122,6 +122,38 @@
     color: #5a5e68;
     white-space: nowrap;
   }
+
+  /* car size controls */
+  #carcontrols {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    color: #9aa0aa;
+  }
+  .slider-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .slider-group label { color: #7a7f8a; }
+  .slider-group b { color: #e3e6ea; min-width: 28px; display: inline-block; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 90px; height: 4px;
+    background: #4a4d55;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: #6fd1ff;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -136,6 +168,18 @@
       <div><span class="key">↑</span><span class="key">↓</span> drive &nbsp; <span class="key">←</span><span class="key">→</span> steer</div>
       <div>speed: <b id="speedVal">0.0</b></div>
       <div>steer: <b id="steerVal">0°</b></div>
+    </div>
+    <div id="carcontrols">
+      <div class="slider-group">
+        <label>scale</label>
+        <input type="range" id="sliderScale" min="0.25" max="3" step="0.05" value="1">
+        <b id="valScale">1.00</b>
+      </div>
+      <div class="slider-group">
+        <label>axis span</label>
+        <input type="range" id="sliderSpan" min="0.3" max="5" step="0.05" value="1">
+        <b id="valSpan">1.00</b>
+      </div>
     </div>
 
     <!-- editor-only controls -->
@@ -160,11 +204,40 @@
   const W = canvas.width;
   const H = canvas.height;
 
-  // ---------- Vehicle parameters ----------
-  const BODY_LENGTH   = 70;
-  const TRACK_WIDTH   = 44;
-  const WHEEL_LENGTH  = 18;
-  const WHEEL_WIDTH   = 7;
+  // ---------- Vehicle base parameters (unscaled) ----------
+  const BASE_BODY_LENGTH  = 70;   // axle-to-axle distance
+  const BASE_TRACK_WIDTH  = 44;   // left-right wheel center distance
+  const BASE_WHEEL_LENGTH = 18;   // wheel rect length (rolling axis)
+  const BASE_WHEEL_WIDTH  = 7;    // wheel rect width
+
+  // Scale parameters — driven by sliders
+  let carScale = 1.0;   // uniform 2D scale (0.25–3)
+  let axisSpan = 1.0;   // stretches body length only (0.3–5)
+
+  // Returns current effective dimensions
+  function carDims() {
+    return {
+      bodyLength  : BASE_BODY_LENGTH  * carScale * axisSpan,
+      trackWidth  : BASE_TRACK_WIDTH  * carScale,
+      wheelLength : BASE_WHEEL_LENGTH * carScale,
+      wheelWidth  : BASE_WHEEL_WIDTH  * carScale,
+    };
+  }
+
+  // Slider wiring
+  const sliderScale = document.getElementById('sliderScale');
+  const sliderSpan  = document.getElementById('sliderSpan');
+  const valScale    = document.getElementById('valScale');
+  const valSpan     = document.getElementById('valSpan');
+
+  sliderScale.addEventListener('input', () => {
+    carScale = parseFloat(sliderScale.value);
+    valScale.textContent = carScale.toFixed(2);
+  });
+  sliderSpan.addEventListener('input', () => {
+    axisSpan = parseFloat(sliderSpan.value);
+    valSpan.textContent = axisSpan.toFixed(2);
+  });
   const MAX_STEER_DEG = 38;
   const STEER_RATE    = 110;
   const STEER_RETURN  = 140;
@@ -182,8 +255,6 @@
     speed: 0,
     steerAngle: 0
   };
-
-  const CAR_COLLISION_RADIUS = Math.hypot(BODY_LENGTH / 2 + WHEEL_LENGTH / 2, TRACK_WIDTH / 2);
 
   // ---------- Structures ----------
   // Each entry: { x, y, length, width, color }
@@ -347,9 +418,9 @@
   }
 
   function isOnCar(px, py) {
-    // approximate with the OBB half-diagonal for the click guard
-    const hL = (BODY_LENGTH + WHEEL_LENGTH) / 2;
-    const hW = TRACK_WIDTH / 2 + WHEEL_WIDTH / 2;
+    const { bodyLength, trackWidth, wheelLength, wheelWidth } = carDims();
+    const hL = bodyLength / 2 + wheelLength / 2;
+    const hW = trackWidth  / 2 + wheelWidth  / 2;
     const r = Math.hypot(hL, hW);
     const dx = px - car.x;
     const dy = py - car.y;
@@ -419,28 +490,26 @@
     car.speed = Math.max(MAX_REVERSE, Math.min(MAX_SPEED, car.speed));
 
     if (Math.abs(car.speed) > 0.01) {
+      const { bodyLength } = carDims();
       const steerRad = car.steerAngle * Math.PI / 180;
-      const rearX = car.x - Math.cos(car.heading) * (BODY_LENGTH / 2);
-      const rearY = car.y - Math.sin(car.heading) * (BODY_LENGTH / 2);
+      const rearX = car.x - Math.cos(car.heading) * (bodyLength / 2);
+      const rearY = car.y - Math.sin(car.heading) * (bodyLength / 2);
       const newRearX = rearX + Math.cos(car.heading) * car.speed * dt;
       const newRearY = rearY + Math.sin(car.heading) * car.speed * dt;
-      car.heading += (car.speed / BODY_LENGTH) * Math.tan(steerRad) * dt;
-      car.x = newRearX + Math.cos(car.heading) * (BODY_LENGTH / 2);
-      car.y = newRearY + Math.sin(car.heading) * (BODY_LENGTH / 2);
+      car.heading += (car.speed / bodyLength) * Math.tan(steerRad) * dt;
+      car.x = newRearX + Math.cos(car.heading) * (bodyLength / 2);
+      car.y = newRearY + Math.sin(car.heading) * (bodyLength / 2);
     }
 
-    const margin = BODY_LENGTH;
+    const { bodyLength, trackWidth, wheelLength, wheelWidth } = carDims();
+    const margin = bodyLength;
     if (car.x < margin)     { car.x = margin;     car.speed = 0; }
     if (car.x > W - margin) { car.x = W - margin; car.speed = 0; }
     if (car.y < margin)     { car.y = margin;      car.speed = 0; }
     if (car.y > H - margin) { car.y = H - margin;  car.speed = 0; }
 
-    // OBB (car) vs AABB (structure) collision via Separating Axis Theorem.
-    // Car box: half-extents hL (along heading) x hW (perpendicular), centered at car.x/y.
-    // We test 4 axes: car's local x/y axes, and structure's x/y axes (world-aligned).
-    // On overlap, push out along the axis of minimum penetration.
-    const hL = (BODY_LENGTH + WHEEL_LENGTH) / 2;  // half-length along heading
-    const hW = TRACK_WIDTH / 2 + WHEEL_WIDTH / 2; // half-width across heading
+    const hL = bodyLength / 2 + wheelLength / 2;  // half body to axle + half wheel overhang
+    const hW = trackWidth  / 2 + wheelWidth  / 2; // half track to wheel center + half wheel width
 
     const cosH = Math.cos(car.heading);
     const sinH = Math.sin(car.heading);
@@ -514,8 +583,9 @@
   }
 
   function drawCar() {
-    const halfBody  = BODY_LENGTH / 2;
-    const halfTrack = TRACK_WIDTH / 2;
+    const { bodyLength, trackWidth, wheelLength, wheelWidth } = carDims();
+    const halfBody  = bodyLength / 2;
+    const halfTrack = trackWidth / 2;
     const cosH = Math.cos(car.heading);
     const sinH = Math.sin(car.heading);
     const perpX = -sinH, perpY = cosH;
@@ -527,7 +597,7 @@
 
     ctx.save();
     ctx.strokeStyle = '#6fd1ff';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 * carScale;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(rearCenterX, rearCenterY);
@@ -535,15 +605,15 @@
     ctx.stroke();
     ctx.restore();
 
-    drawRectAt(rearCenterX,  rearCenterY,  car.heading + Math.PI / 2, TRACK_WIDTH, 3, '#3d4250', null);
-    drawRectAt(frontCenterX, frontCenterY, car.heading + Math.PI / 2, TRACK_WIDTH, 3, '#3d4250', null);
+    drawRectAt(rearCenterX,  rearCenterY,  car.heading + Math.PI / 2, trackWidth, 3 * carScale, '#3d4250', null);
+    drawRectAt(frontCenterX, frontCenterY, car.heading + Math.PI / 2, trackWidth, 3 * carScale, '#3d4250', null);
 
     const rearLeftX  = rearCenterX  + perpX * halfTrack;
     const rearLeftY  = rearCenterY  + perpY * halfTrack;
     const rearRightX = rearCenterX  - perpX * halfTrack;
     const rearRightY = rearCenterY  - perpY * halfTrack;
-    drawRectAt(rearLeftX,  rearLeftY,  car.heading, WHEEL_LENGTH, WHEEL_WIDTH, '#1c1e22', '#000');
-    drawRectAt(rearRightX, rearRightY, car.heading, WHEEL_LENGTH, WHEEL_WIDTH, '#1c1e22', '#000');
+    drawRectAt(rearLeftX,  rearLeftY,  car.heading, wheelLength, wheelWidth, '#1c1e22', '#000');
+    drawRectAt(rearRightX, rearRightY, car.heading, wheelLength, wheelWidth, '#1c1e22', '#000');
 
     const steerRad = car.steerAngle * Math.PI / 180;
     const frontWheelAngle = car.heading + steerRad;
@@ -551,13 +621,13 @@
     const frontLeftY  = frontCenterY + perpY * halfTrack;
     const frontRightX = frontCenterX - perpX * halfTrack;
     const frontRightY = frontCenterY - perpY * halfTrack;
-    drawRectAt(frontLeftX,  frontLeftY,  frontWheelAngle, WHEEL_LENGTH, WHEEL_WIDTH, '#ffb454', '#000');
-    drawRectAt(frontRightX, frontRightY, frontWheelAngle, WHEEL_LENGTH, WHEEL_WIDTH, '#ffb454', '#000');
+    drawRectAt(frontLeftX,  frontLeftY,  frontWheelAngle, wheelLength, wheelWidth, '#ffb454', '#000');
+    drawRectAt(frontRightX, frontRightY, frontWheelAngle, wheelLength, wheelWidth, '#ffb454', '#000');
 
     ctx.save();
     ctx.fillStyle = '#6fd1ff';
     ctx.beginPath();
-    ctx.arc(frontCenterX, frontCenterY, 3.5, 0, Math.PI * 2);
+    ctx.arc(frontCenterX, frontCenterY, 3.5 * carScale, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
