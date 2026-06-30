@@ -1,0 +1,10 @@
+please create following html game:
+OVERVIEW:
+a simple 2d game. the main avatar is simple vhicle. 
+GAME WORLD: a finite 2d plane. top view. static frame. 
+GAME OBJECTS:
+a simple 4 wheeled vhicle. mimnimalistic design, is roughly the shape of an I, where the top and bottom dashes are the front and rear access, and there are wheels on both sides of either, as expected 
+on a 4 wheeled vehicle. both wheels of the front axis are subject to steering, ie, changing their rotation from the top view. 
+the vehicle has a trailer harnessed to it. it is roughly the same size of the vehicle, it has 2 wheel on its rear side on independent axis. the trailer behaves as a standard 2 wheels trailer would 
+
+CONTROL: the vehicle is controlled by keyboard keys, up and down arrow for go and stop, left and right rotate the front wheels, each around its own distnictive center. the direction in which the car travels is consitent with the said steering.

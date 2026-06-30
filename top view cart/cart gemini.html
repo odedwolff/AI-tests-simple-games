@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Top-Down Vehicle Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 5px 0;
+            font-size: 1.5rem;
+            letter-spacing: 1px;
+        }
+
+        .instructions {
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #aaaaaa;
+            text-align: center;
+        }
+
+        canvas {
+            border: 4px solid #444;
+            background-color: #222;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Vehicle Steering Mechanics Sandbox</h1>
+    <div class="instructions">
+        Use <b>Up / Down Arrows</b> to accelerate/reverse. Use <b>Left / Right Arrows</b> to steer the front wheels.
+    </div>
+
+    <canvas id="gameCanvas" width="900" height="650"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Input Tracking
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = true;
+                e.preventDefault(); // Prevent page scrolling
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = false;
+                e.preventDefault();
+            }
+        });
+
+        // Vehicle Configuration & State
+        const car = {
+            // Position referenced at the center of the rear axle
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            heading: 0,          // In radians, 0 is pointing right (East)
+            speed: 0,
+            steerAngle: 0,       // Angle of front wheels relative to chassis
+
+            // Dimensions
+            length: 70,          // Distance between front and rear axle (Wheelbase)
+            width: 50,           // Distance between left and right wheels (Track width)
+            wheelLength: 20,
+            wheelWidth: 8,
+
+            // Physics constants
+            maxSpeed: 5,
+            backwardsMaxSpeed: -2.5,
+            acceleration: 0.15,
+            deceleration: 0.08,
+            friction: 0.04,
+            maxSteerAngle: 0.6,  // ~34 degrees max turn radius
+            steerSpeed: 0.05,
+            steerReturnSpeed: 0.06
+        };
+
+        // Draw a subtle grid background to enhance perception of movement
+        function drawGrid() {
+            ctx.strokeStyle = '#2d2d2d';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function updatePhysics() {
+            // 1. Handle Acceleration & Braking
+            if (keys.ArrowUp) {
+                if (car.speed < car.maxSpeed) car.speed += car.acceleration;
+            } else if (keys.ArrowDown) {
+                if (car.speed > car.backwardsMaxSpeed) car.speed -= car.acceleration;
+            } else {
+                // Apply passive friction when no keys are pressed
+                if (car.speed > 0) car.speed = Math.max(0, car.speed - car.friction);
+                else if (car.speed < 0) car.speed = Math.min(0, car.speed + car.friction);
+            }
+
+            // 2. Handle Steering Input & Auto-centering
+            if (keys.ArrowLeft) {
+                car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - car.steerSpeed);
+            } else if (keys.ArrowRight) {
+                car.steerAngle = Math.min(car.maxSteerAngle, car.steerAngle + car.steerSpeed);
+            } else {
+                // Smoothly return wheels to center position when no input given
+                if (car.steerAngle > 0) car.steerAngle = Math.max(0, car.steerAngle - car.steerReturnSpeed);
+                else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
+            }
+
+            // 3. Kinematic Bicycle Model Equations
+            // Rear axle coordinates move directly along the chassis direction vector
+            car.x += car.speed * Math.cos(car.heading);
+            car.y += car.speed * Math.sin(car.heading);
+            
+            // Angular velocity depends on speed and steering angle divided by wheelbase length
+            car.heading += (car.speed * Math.tan(car.steerAngle)) / car.length;
+
+            // 4. Boundary Collision (Finite Plane Constraints)
+            const margin = car.length;
+            if (car.x < margin) { car.x = margin; car.speed = 0; }
+            if (car.x > canvas.width - margin) { car.x = canvas.width - margin; car.speed = 0; }
+            if (car.y < margin) { car.y = margin; car.speed = 0; }
+            if (car.y > canvas.height - margin) { car.y = canvas.height - margin; car.speed = 0; }
+        }
+
+        function drawWheel(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            // Minimalistic wheel styling
+            ctx.fillStyle = '#00e676'; // Bright green active wheels
+            ctx.fillRect(-car.wheelLength / 2, -car.wheelWidth / 2, car.wheelLength, car.wheelWidth);
+            
+            // Center tread line to emphasize rotation vector
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-car.wheelLength / 2, 0);
+            ctx.lineTo(car.wheelLength / 2, 0);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function drawVehicle() {
+            ctx.save();
+            // Translate origin to the rear axle center point and orient with chassis heading
+            ctx.translate(car.x, car.y);
+            ctx.rotate(car.heading);
+
+            // ---- DRAW "I" SHAPED CHASSIS ----
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            // 1. Central spine connection (Rear axle to Front axle)
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(car.length, 0);
+            ctx.stroke();
+
+            // 2. Rear Axle (The bottom dash of the "I")
+            ctx.beginPath();
+            ctx.moveTo(0, -car.width / 2);
+            ctx.lineTo(0, car.width / 2);
+            ctx.stroke();
+
+            // 3. Front Axle (The top dash of the "I")
+            ctx.beginPath();
+            ctx.moveTo(car.length, -car.width / 2);
+            ctx.lineTo(car.length, car.width / 2);
+            ctx.stroke();
+
+            // Minimalist structural node identifiers
+            ctx.fillStyle = '#ff5252';
+            ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(car.length, 0, 4, 0, Math.PI * 2); ctx.fill();
+
+            // ---- DRAW WHEELS ----
+            // Rear left & right wheels (Fixed orientation parallel to chassis frame)
+            drawWheel(0, -car.width / 2, 0);
+            drawWheel(0, car.width / 2, 0);
+
+            // Front left & right wheels (Rotated around their distinct pivot joint centers)
+            drawWheel(car.length, -car.width / 2, car.steerAngle);
+            drawWheel(car.length, car.width / 2, car.steerAngle);
+
+            ctx.restore();
+        }
+
+        function drawHUD() {
+            ctx.fillStyle = '#888';
+            ctx.font = '14px monospace';
+            ctx.fillText(`Speed: ${car.speed.toFixed(2)}`, 20, 30);
+            ctx.fillText(`Steer Angle: ${(car.steerAngle * (180 / Math.PI)).toFixed(1)}°`, 20, 50);
+        }
+
+        // Main Execution Game Loop
+        function loop() {
+            // Clear Frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Render Background Environment
+            drawGrid();
+
+            // Logic step
+            updatePhysics();
+
+            // Render Entities
+            drawVehicle();
+            drawHUD();
+
+            requestAnimationFrame(loop);
+        }
+
+        // Initialization
+        loop();
+    </script>
+</body>
+</html>
