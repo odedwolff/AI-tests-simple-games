@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Top-Down Vehicle Simulation</title>
+    <title>2D Vehicle & Trailer Simulation</title>
     <style>
         body {
             margin: 0;
@@ -42,12 +42,13 @@
 </head>
 <body>
 
-    <h1>Vehicle Steering Mechanics Sandbox</h1>
+    <h1>Vehicle & Trailer Kinematics</h1>
     <div class="instructions">
-        Use <b>Up / Down Arrows</b> to accelerate/reverse. Use <b>Left / Right Arrows</b> to steer the front wheels.
+        Use <b>Up / Down Arrows</b> to drive. Use <b>Left / Right Arrows</b> to steer. <br>
+        <i>Watch out when reversing—the trailer will jackknife!</i>
     </div>
 
-    <canvas id="gameCanvas" width="900" height="650"></canvas>
+    <canvas id="gameCanvas" width="1000" height="700"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -64,7 +65,7 @@
         window.addEventListener('keydown', (e) => {
             if (e.key in keys) {
                 keys[e.key] = true;
-                e.preventDefault(); // Prevent page scrolling
+                e.preventDefault();
             }
         });
 
@@ -77,31 +78,43 @@
 
         // Vehicle Configuration & State
         const car = {
-            // Position referenced at the center of the rear axle
-            x: canvas.width / 2,
+            x: canvas.width / 2 + 50,
             y: canvas.height / 2,
-            heading: 0,          // In radians, 0 is pointing right (East)
+            heading: 0,          // 0 = East
             speed: 0,
-            steerAngle: 0,       // Angle of front wheels relative to chassis
+            steerAngle: 0,       
 
             // Dimensions
-            length: 70,          // Distance between front and rear axle (Wheelbase)
-            width: 50,           // Distance between left and right wheels (Track width)
+            length: 70,          // Wheelbase
+            width: 50,           // Track width
             wheelLength: 20,
             wheelWidth: 8,
 
-            // Physics constants
-            maxSpeed: 5,
-            backwardsMaxSpeed: -2.5,
-            acceleration: 0.15,
+            // Physics
+            maxSpeed: 4.5,
+            backwardsMaxSpeed: -2.0,
+            acceleration: 0.12,
             deceleration: 0.08,
             friction: 0.04,
-            maxSteerAngle: 0.6,  // ~34 degrees max turn radius
+            maxSteerAngle: 0.6,  
             steerSpeed: 0.05,
             steerReturnSpeed: 0.06
         };
 
-        // Draw a subtle grid background to enhance perception of movement
+        // Trailer Configuration & State
+        const trailer = {
+            // Positioned behind the car initially
+            x: (canvas.width / 2 + 50) - 75, 
+            y: canvas.height / 2,
+            heading: 0,
+
+            // Dimensions
+            length: 65,          // Distance from hitch point to trailer axle
+            width: 54,           // Trailer axle track width (slightly wider)
+            wheelLength: 22,
+            wheelWidth: 9
+        };
+
         function drawGrid() {
             ctx.strokeStyle = '#2d2d2d';
             ctx.lineWidth = 1;
@@ -122,37 +135,48 @@
         }
 
         function updatePhysics() {
-            // 1. Handle Acceleration & Braking
+            // 1. Car Acceleration & Braking
             if (keys.ArrowUp) {
                 if (car.speed < car.maxSpeed) car.speed += car.acceleration;
             } else if (keys.ArrowDown) {
                 if (car.speed > car.backwardsMaxSpeed) car.speed -= car.acceleration;
             } else {
-                // Apply passive friction when no keys are pressed
                 if (car.speed > 0) car.speed = Math.max(0, car.speed - car.friction);
                 else if (car.speed < 0) car.speed = Math.min(0, car.speed + car.friction);
             }
 
-            // 2. Handle Steering Input & Auto-centering
+            // 2. Car Steering
             if (keys.ArrowLeft) {
                 car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - car.steerSpeed);
             } else if (keys.ArrowRight) {
                 car.steerAngle = Math.min(car.maxSteerAngle, car.steerAngle + car.steerSpeed);
             } else {
-                // Smoothly return wheels to center position when no input given
                 if (car.steerAngle > 0) car.steerAngle = Math.max(0, car.steerAngle - car.steerReturnSpeed);
                 else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
             }
 
-            // 3. Kinematic Bicycle Model Equations
-            // Rear axle coordinates move directly along the chassis direction vector
+            // 3. Update Car Position & Heading
             car.x += car.speed * Math.cos(car.heading);
             car.y += car.speed * Math.sin(car.heading);
-            
-            // Angular velocity depends on speed and steering angle divided by wheelbase length
             car.heading += (car.speed * Math.tan(car.steerAngle)) / car.length;
 
-            // 4. Boundary Collision (Finite Plane Constraints)
+            // 4. Update Trailer Kinematics (Hitch-to-Axle Constraint)
+            // The hitch point is located at the center of the car's rear axle (car.x, car.y)
+            const hitchX = car.x;
+            const hitchY = car.y;
+
+            // Vector pointing from trailer axle to the hitch point
+            const dx = hitchX - trailer.x;
+            const dy = hitchY - trailer.y;
+
+            // Trailer rotates to align its tongue directly with the moving hitch point
+            trailer.heading = Math.atan2(dy, dx);
+
+            // Maintain the rigid structural link constraint (pulling or pushing the trailer axle)
+            trailer.x = hitchX - trailer.length * Math.cos(trailer.heading);
+            trailer.y = hitchY - trailer.length * Math.sin(trailer.heading);
+
+            // 5. Boundary Collisions (Keep both within bounds)
             const margin = car.length;
             if (car.x < margin) { car.x = margin; car.speed = 0; }
             if (car.x > canvas.width - margin) { car.x = canvas.width - margin; car.speed = 0; }
@@ -160,68 +184,99 @@
             if (car.y > canvas.height - margin) { car.y = canvas.height - margin; car.speed = 0; }
         }
 
-        function drawWheel(x, y, angle) {
+        function drawWheel(x, y, angle, width, length, color = '#00e676') {
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(angle);
             
-            // Minimalistic wheel styling
-            ctx.fillStyle = '#00e676'; // Bright green active wheels
-            ctx.fillRect(-car.wheelLength / 2, -car.wheelWidth / 2, car.wheelLength, car.wheelWidth);
+            ctx.fillStyle = color; 
+            ctx.fillRect(-length / 2, -width / 2, length, width);
             
-            // Center tread line to emphasize rotation vector
+            // Center tread line
             ctx.strokeStyle = '#111';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-car.wheelLength / 2, 0);
-            ctx.lineTo(car.wheelLength / 2, 0);
+            ctx.moveTo(-length / 2, 0);
+            ctx.lineTo(length / 2, 0);
             ctx.stroke();
             
             ctx.restore();
         }
 
-        function drawVehicle() {
+        function drawCar() {
             ctx.save();
-            // Translate origin to the rear axle center point and orient with chassis heading
             ctx.translate(car.x, car.y);
             ctx.rotate(car.heading);
 
-            // ---- DRAW "I" SHAPED CHASSIS ----
+            // "I" Shaped Chassis Frame
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // 1. Central spine connection (Rear axle to Front axle)
+            // Central structural spine
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(car.length, 0);
             ctx.stroke();
 
-            // 2. Rear Axle (The bottom dash of the "I")
+            // Rear Axle 
             ctx.beginPath();
             ctx.moveTo(0, -car.width / 2);
             ctx.lineTo(0, car.width / 2);
             ctx.stroke();
 
-            // 3. Front Axle (The top dash of the "I")
+            // Front Axle
             ctx.beginPath();
             ctx.moveTo(car.length, -car.width / 2);
             ctx.lineTo(car.length, car.width / 2);
             ctx.stroke();
 
-            // Minimalist structural node identifiers
+            // Joint Nodes
             ctx.fillStyle = '#ff5252';
-            ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); // Hitch/Rear center
             ctx.beginPath(); ctx.arc(car.length, 0, 4, 0, Math.PI * 2); ctx.fill();
 
-            // ---- DRAW WHEELS ----
-            // Rear left & right wheels (Fixed orientation parallel to chassis frame)
-            drawWheel(0, -car.width / 2, 0);
-            drawWheel(0, car.width / 2, 0);
+            // Rear Wheels (Fixed)
+            drawWheel(0, -car.width / 2, 0, car.wheelWidth, car.wheelLength);
+            drawWheel(0, car.width / 2, 0, car.wheelWidth, car.wheelLength);
 
-            // Front left & right wheels (Rotated around their distinct pivot joint centers)
-            drawWheel(car.length, -car.width / 2, car.steerAngle);
-            drawWheel(car.length, car.width / 2, car.steerAngle);
+            // Front Steering Wheels (Dynamic)
+            drawWheel(car.length, -car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
+            drawWheel(car.length, car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
+
+            ctx.restore();
+        }
+
+        function drawTrailer() {
+            ctx.save();
+            ctx.translate(trailer.x, trailer.y);
+            ctx.rotate(trailer.heading);
+
+            // Trailer Chassis Frame (T-Shape layout)
+            ctx.strokeStyle = '#4fc3f7'; // Light blue structural accent
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            // Drawbar/Tongue extending forward to the hitch
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(trailer.length, 0);
+            ctx.stroke();
+
+            // Trailer Single Axle
+            ctx.beginPath();
+            ctx.moveTo(0, -trailer.width / 2);
+            ctx.lineTo(0, trailer.width / 2);
+            ctx.stroke();
+
+            // Bed outline (Minimalistic rectangle platform representation)
+            ctx.strokeStyle = 'rgba(79, 195, 247, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-15, -trailer.width / 2, 35, trailer.width);
+
+            // Trailer Wheels (Fixed direction relative to trailer frame)
+            drawWheel(0, -trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d'); // Amber wheels
+            drawWheel(0, trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d');
 
             ctx.restore();
         }
@@ -230,28 +285,31 @@
             ctx.fillStyle = '#888';
             ctx.font = '14px monospace';
             ctx.fillText(`Speed: ${car.speed.toFixed(2)}`, 20, 30);
-            ctx.fillText(`Steer Angle: ${(car.steerAngle * (180 / Math.PI)).toFixed(1)}°`, 20, 50);
+            
+            // Calculate relative angle between truck and trailer to show jackknife status
+            let relativeAngle = (car.heading - trailer.heading) * (180 / Math.PI);
+            // Normalize to -180 to 180
+            relativeAngle = ((relativeAngle + 180) % 360 + 360) % 360 - 180;
+            
+            ctx.fillStyle = Math.abs(relativeAngle) > 50 ? '#ff5252' : '#888';
+            ctx.fillText(`Hitch Angle: ${relativeAngle.toFixed(1)}°`, 20, 50);
         }
 
-        // Main Execution Game Loop
+        // Main Loop
         function loop() {
-            // Clear Frame
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Render Background Environment
             drawGrid();
-
-            // Logic step
             updatePhysics();
-
-            // Render Entities
-            drawVehicle();
+            
+            // Render underlying trailer first so hitch sits perfectly under/at the car chassis layer
+            drawTrailer();
+            drawCar();
             drawHUD();
 
             requestAnimationFrame(loop);
         }
 
-        // Initialization
         loop();
     </script>
 </body>
