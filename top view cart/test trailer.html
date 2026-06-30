@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vehicle & Trailer Simulation</title>
+    <title>2D Vehicle & Trailer Simulation - Dev Panel</title>
     <style>
         body {
             margin: 0;
@@ -32,67 +32,161 @@
             text-align: center;
         }
 
-        canvas {
-            border: 4px solid #444;
-            background-color: #222;
+        /* Layout Grid for Canvas + Side Panel */
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+        }
+
+        canvas {
+            background-color: #222;
             border-radius: 4px;
+        }
+
+        /* Developer Panel Styling */
+        .dev-panel {
+            width: 260px;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid #3a3a3a;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .dev-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #4fc3f7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #3a3a3a;
+            padding-bottom: 5px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.85rem;
+            color: #ccc;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-group label span {
+            font-family: monospace;
+            color: #00e676;
+            font-weight: bold;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            accent-color: #4fc3f7;
+            cursor: pointer;
+        }
+
+        .note {
+            font-size: 0.75rem;
+            color: #888;
+            font-style: italic;
+            line-height: 1.3;
         }
     </style>
 </head>
 <body>
 
-    <h1>Vehicle & Trailer Kinematics</h1>
+    <h1>Vehicle & Trailer Kinematics Sandbox</h1>
     <div class="instructions">
-        Use <b>Up / Down Arrows</b> to drive. Use <b>Left / Right Arrows</b> to steer. <br>
-        <i>Watch out when reversing—the trailer will jackknife!</i>
+        Use <b>Up / Down Arrows</b> to drive. Use <b>Left / Right Arrows</b> to steer.
     </div>
 
-    <canvas id="gameCanvas" width="1000" height="700"></canvas>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="900" height="650"></canvas>
+
+        <div class="dev-panel">
+            <h2>Developer Controls</h2>
+            
+            <div class="control-group">
+                <label for="reverseSpeedSlider">
+                    Max Reverse Speed: <span id="reverseSpeedVal">-2.0</span>
+                </label>
+                <input type="range" id="reverseSpeedSlider" min="-5.0" max="-0.5" step="0.1" value="-2.0">
+                <div class="note">Controls maximum velocity when backing up.</div>
+            </div>
+
+            <div class="control-group">
+                <label for="jointFrictionSlider">
+                    Joint Friction: <span id="jointFrictionVal">0.00</span>
+                </label>
+                <input type="range" id="jointFrictionSlider" min="0.00" max="0.95" step="0.05" value="0.00">
+                <div class="note">Higher settings make the hitch stiffer, resisting rapid turning and dampening sway/jackknifing.</div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Input Tracking
-        const keys = {
-            ArrowUp: false,
-            ArrowDown: false,
-            ArrowLeft: false,
-            ArrowRight: false
+        // Dynamic Settings Linked to Dev Panel
+        const devSettings = {
+            maxBackwardsSpeed: -2.0,
+            jointFriction: 0.00
         };
 
+        // DOM Elements for Panel Interaction
+        const reverseSlider = document.getElementById('reverseSpeedSlider');
+        const reverseValDisplay = document.getElementById('reverseSpeedVal');
+        const frictionSlider = document.getElementById('jointFrictionSlider');
+        const frictionValDisplay = document.getElementById('jointFrictionVal');
+
+        // Input Listeners for UI Sliders
+        reverseSlider.addEventListener('input', (e) => {
+            devSettings.maxBackwardsSpeed = parseFloat(e.target.value);
+            reverseValDisplay.textContent = devSettings.maxBackwardsSpeed.toFixed(1);
+        });
+
+        frictionSlider.addEventListener('input', (e) => {
+            devSettings.jointFriction = parseFloat(e.target.value);
+            frictionValDisplay.textContent = devSettings.jointFriction.toFixed(2);
+        });
+
+        // Keyboard Input Tracking
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
         window.addEventListener('keydown', (e) => {
-            if (e.key in keys) {
-                keys[e.key] = true;
-                e.preventDefault();
-            }
+            if (e.key in keys) { keys[e.key] = true; e.preventDefault(); }
         });
 
         window.addEventListener('keyup', (e) => {
-            if (e.key in keys) {
-                keys[e.key] = false;
-                e.preventDefault();
-            }
+            if (e.key in keys) { keys[e.key] = false; e.preventDefault(); }
         });
 
-        // Vehicle Configuration & State
+        // Vehicle State
         const car = {
             x: canvas.width / 2 + 50,
             y: canvas.height / 2,
-            heading: 0,          // 0 = East
+            heading: 0,          
             speed: 0,
             steerAngle: 0,       
 
-            // Dimensions
             length: 70,          // Wheelbase
             width: 50,           // Track width
             wheelLength: 20,
             wheelWidth: 8,
 
-            // Physics
             maxSpeed: 4.5,
-            backwardsMaxSpeed: -2.0,
             acceleration: 0.12,
             deceleration: 0.08,
             friction: 0.04,
@@ -101,16 +195,14 @@
             steerReturnSpeed: 0.06
         };
 
-        // Trailer Configuration & State
+        // Trailer State
         const trailer = {
-            // Positioned behind the car initially
             x: (canvas.width / 2 + 50) - 75, 
             y: canvas.height / 2,
             heading: 0,
 
-            // Dimensions
-            length: 65,          // Distance from hitch point to trailer axle
-            width: 54,           // Trailer axle track width (slightly wider)
+            length: 65,          
+            width: 54,           
             wheelLength: 22,
             wheelWidth: 9
         };
@@ -119,30 +211,28 @@
             ctx.strokeStyle = '#2d2d2d';
             ctx.lineWidth = 1;
             const gridSize = 50;
-            
             for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
             }
             for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
         }
 
         function updatePhysics() {
-            // 1. Car Acceleration & Braking
+            // 1. Car Acceleration & Braking (Using Dynamic Dev Value)
             if (keys.ArrowUp) {
                 if (car.speed < car.maxSpeed) car.speed += car.acceleration;
             } else if (keys.ArrowDown) {
-                if (car.speed > car.backwardsMaxSpeed) car.speed -= car.acceleration;
+                if (car.speed > devSettings.maxBackwardsSpeed) car.speed -= car.acceleration;
             } else {
                 if (car.speed > 0) car.speed = Math.max(0, car.speed - car.friction);
                 else if (car.speed < 0) car.speed = Math.min(0, car.speed + car.friction);
+            }
+
+            // Cap reverse speed instantly if developer dials slider down while vehicle is moving backward
+            if (car.speed < devSettings.maxBackwardsSpeed) {
+                car.speed = devSettings.maxBackwardsSpeed;
             }
 
             // 2. Car Steering
@@ -160,23 +250,33 @@
             car.y += car.speed * Math.sin(car.heading);
             car.heading += (car.speed * Math.tan(car.steerAngle)) / car.length;
 
-            // 4. Update Trailer Kinematics (Hitch-to-Axle Constraint)
-            // The hitch point is located at the center of the car's rear axle (car.x, car.y)
+            // 4. Update Trailer Kinematics with Friction Dynamics
             const hitchX = car.x;
             const hitchY = car.y;
 
-            // Vector pointing from trailer axle to the hitch point
             const dx = hitchX - trailer.x;
             const dy = hitchY - trailer.y;
 
-            // Trailer rotates to align its tongue directly with the moving hitch point
-            trailer.heading = Math.atan2(dy, dx);
+            // Ideal targeted angle matching the vector path
+            const targetHeading = Math.atan2(dy, dx);
 
-            // Maintain the rigid structural link constraint (pulling or pushing the trailer axle)
+            // Compute structural angular difference between current and targeted angle
+            let angleDiff = targetHeading - trailer.heading;
+            
+            // Normalize angle variation to ensure smooth wrap-arounds [-PI, PI]
+            angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+
+            // Apply joint friction/stiffness via dynamic interpolation
+            // friction = 0 -> lerp factor = 1 (instant snap)
+            // friction = 0.95 -> lerp factor = 0.05 (delayed response / high resistance)
+            const rigidityFactor = 1 - devSettings.jointFriction;
+            trailer.heading += angleDiff * rigidityFactor;
+
+            // Enforce hard link length restriction along the resulting calculated angle vector
             trailer.x = hitchX - trailer.length * Math.cos(trailer.heading);
             trailer.y = hitchY - trailer.length * Math.sin(trailer.heading);
 
-            // 5. Boundary Collisions (Keep both within bounds)
+            // 5. Hard Map Boundary Constraints
             const margin = car.length;
             if (car.x < margin) { car.x = margin; car.speed = 0; }
             if (car.x > canvas.width - margin) { car.x = canvas.width - margin; car.speed = 0; }
@@ -188,18 +288,11 @@
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(angle);
-            
             ctx.fillStyle = color; 
             ctx.fillRect(-length / 2, -width / 2, length, width);
-            
-            // Center tread line
             ctx.strokeStyle = '#111';
             ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(-length / 2, 0);
-            ctx.lineTo(length / 2, 0);
-            ctx.stroke();
-            
+            ctx.beginPath(); ctx.moveTo(-length / 2, 0); ctx.lineTo(length / 2, 0); ctx.stroke();
             ctx.restore();
         }
 
@@ -208,39 +301,25 @@
             ctx.translate(car.x, car.y);
             ctx.rotate(car.heading);
 
-            // "I" Shaped Chassis Frame
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // Central structural spine
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(car.length, 0);
-            ctx.stroke();
-
-            // Rear Axle 
-            ctx.beginPath();
-            ctx.moveTo(0, -car.width / 2);
-            ctx.lineTo(0, car.width / 2);
-            ctx.stroke();
-
+            // Spine
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(car.length, 0); ctx.stroke();
+            // Rear Axle
+            ctx.beginPath(); ctx.moveTo(0, -car.width / 2); ctx.lineTo(0, car.width / 2); ctx.stroke();
             // Front Axle
-            ctx.beginPath();
-            ctx.moveTo(car.length, -car.width / 2);
-            ctx.lineTo(car.length, car.width / 2);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(car.length, -car.width / 2); ctx.lineTo(car.length, car.width / 2); ctx.stroke();
 
-            // Joint Nodes
+            // Joint Markers
             ctx.fillStyle = '#ff5252';
-            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); // Hitch/Rear center
+            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(car.length, 0, 4, 0, Math.PI * 2); ctx.fill();
 
-            // Rear Wheels (Fixed)
+            // Wheels
             drawWheel(0, -car.width / 2, 0, car.wheelWidth, car.wheelLength);
             drawWheel(0, car.width / 2, 0, car.wheelWidth, car.wheelLength);
-
-            // Front Steering Wheels (Dynamic)
             drawWheel(car.length, -car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
             drawWheel(car.length, car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
 
@@ -252,30 +331,22 @@
             ctx.translate(trailer.x, trailer.y);
             ctx.rotate(trailer.heading);
 
-            // Trailer Chassis Frame (T-Shape layout)
-            ctx.strokeStyle = '#4fc3f7'; // Light blue structural accent
+            ctx.strokeStyle = '#4fc3f7'; 
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // Drawbar/Tongue extending forward to the hitch
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(trailer.length, 0);
-            ctx.stroke();
+            // Tongue
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(trailer.length, 0); ctx.stroke();
+            // Axle
+            ctx.beginPath(); ctx.moveTo(0, -trailer.width / 2); ctx.lineTo(0, trailer.width / 2); ctx.stroke();
 
-            // Trailer Single Axle
-            ctx.beginPath();
-            ctx.moveTo(0, -trailer.width / 2);
-            ctx.lineTo(0, trailer.width / 2);
-            ctx.stroke();
-
-            // Bed outline (Minimalistic rectangle platform representation)
+            // Structural Frame Visual Box
             ctx.strokeStyle = 'rgba(79, 195, 247, 0.3)';
             ctx.lineWidth = 2;
             ctx.strokeRect(-15, -trailer.width / 2, 35, trailer.width);
 
-            // Trailer Wheels (Fixed direction relative to trailer frame)
-            drawWheel(0, -trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d'); // Amber wheels
+            // Trailer Wheels
+            drawWheel(0, -trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d');
             drawWheel(0, trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d');
 
             ctx.restore();
@@ -286,27 +357,20 @@
             ctx.font = '14px monospace';
             ctx.fillText(`Speed: ${car.speed.toFixed(2)}`, 20, 30);
             
-            // Calculate relative angle between truck and trailer to show jackknife status
             let relativeAngle = (car.heading - trailer.heading) * (180 / Math.PI);
-            // Normalize to -180 to 180
             relativeAngle = ((relativeAngle + 180) % 360 + 360) % 360 - 180;
             
             ctx.fillStyle = Math.abs(relativeAngle) > 50 ? '#ff5252' : '#888';
             ctx.fillText(`Hitch Angle: ${relativeAngle.toFixed(1)}°`, 20, 50);
         }
 
-        // Main Loop
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             drawGrid();
             updatePhysics();
-            
-            // Render underlying trailer first so hitch sits perfectly under/at the car chassis layer
             drawTrailer();
             drawCar();
             drawHUD();
-
             requestAnimationFrame(loop);
         }
 
