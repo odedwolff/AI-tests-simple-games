@@ -1,6 +1,6 @@
-Ah, eagle eye! My apologies—I dropped a `ctx.` on the trailer's axle rendering line, which threw a silent JavaScript error in your browser console and completely halted the game loop right at the start.
+Here is the updated, complete single-file HTML5 simulation.
 
-Here is the fully corrected, working code with that typo fixed (`stroke()` changed back to `ctx.stroke()`). Save this code, and your vehicle and trailer will be fully visible and drivable.
+Two new scale sliders have been added to the Developer Panel. By utilizing the canvas 2D transformation matrix (`ctx.scale`), both models scale **relative to their kinematic pivot points** (the vehicle scales outward from its rear-axle hitch center, and the trailer scales outward from its wheel-axle center). The physics engine dynamically adapts to these scale shifts, updating the turning radius and structural tongue constraints automatically.
 
 ```html
 <!DOCTYPE html>
@@ -8,7 +8,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vehicle & Trailer Simulation - Fixed</title>
+    <title>2D Vehicle & Trailer Simulation - Scale Sandbox</title>
     <style>
         body {
             margin: 0;
@@ -37,6 +37,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             text-align: center;
         }
 
+        /* Layout Grid for Canvas + Side Panel */
         .game-container {
             display: flex;
             flex-direction: row;
@@ -53,6 +54,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             border-radius: 4px;
         }
 
+        /* Developer Panel Styling */
         .dev-panel {
             width: 260px;
             background-color: #1e1e1e;
@@ -61,7 +63,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             border: 1px solid #3a3a3a;
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 14px;
         }
 
         .dev-panel h2 {
@@ -77,7 +79,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
         .control-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
         }
 
         .control-group label {
@@ -100,10 +102,10 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
         }
 
         .note {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: #888;
             font-style: italic;
-            line-height: 1.3;
+            line-height: 1.2;
         }
     </style>
 </head>
@@ -125,7 +127,6 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
                     Max Forward Speed: <span id="maxSpeedVal">4.5</span>
                 </label>
                 <input type="range" id="maxSpeedSlider" min="1.0" max="10.0" step="0.1" value="4.5">
-                <div class="note">Limits maximum forward velocity.</div>
             </div>
 
             <div class="control-group">
@@ -133,15 +134,13 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
                     Max Reverse Speed: <span id="reverseSpeedVal">-2.0</span>
                 </label>
                 <input type="range" id="reverseSpeedSlider" min="-5.0" max="-0.5" step="0.1" value="-2.0">
-                <div class="note">Limits maximum backward velocity.</div>
             </div>
 
             <div class="control-group">
                 <label for="trailerLengthSlider">
-                    Trailer Length: <span id="trailerLengthVal">65</span> px
+                    Base Trailer Length: <span id="trailerLengthVal">65</span> px
                 </label>
                 <input type="range" id="trailerLengthSlider" min="30" max="150" step="5" value="65">
-                <div class="note">Alters tongue distance from rear hitch to trailer axle.</div>
             </div>
 
             <div class="control-group">
@@ -149,7 +148,24 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
                     Joint Friction: <span id="jointFrictionVal">0.00</span>
                 </label>
                 <input type="range" id="jointFrictionSlider" min="0.00" max="0.95" step="0.05" value="0.00">
-                <div class="note">Stiffens the hitch joint, reducing sudden sway patterns.</div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #333; margin: 5px 0;">
+
+            <div class="control-group">
+                <label for="carScaleSlider">
+                    Vehicle Scale: <span id="carScaleVal">1.0</span>x
+                </label>
+                <input type="range" id="carScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
+                <div class="note">Scales the vehicle chassis outward from its rear hitch axle.</div>
+            </div>
+
+            <div class="control-group">
+                <label for="trailerScaleSlider">
+                    Trailer Scale: <span id="trailerScaleVal">1.0</span>x
+                </label>
+                <input type="range" id="trailerScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
+                <div class="note">Scales the trailer structure outward from its wheel axle center.</div>
             </div>
         </div>
     </div>
@@ -163,7 +179,9 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             maxSpeed: 4.5,
             maxBackwardsSpeed: -2.0,
             trailerLength: 65,
-            jointFriction: 0.00
+            jointFriction: 0.00,
+            carScale: 1.0,
+            trailerScale: 1.0
         };
 
         // DOM Element Mapping
@@ -175,53 +193,53 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
         const trailerLengthVal = document.getElementById('trailerLengthVal');
         const frictionSlider = document.getElementById('jointFrictionSlider');
         const frictionVal = document.getElementById('jointFrictionVal');
+        const carScaleSlider = document.getElementById('carScaleSlider');
+        const carScaleVal = document.getElementById('carScaleVal');
+        const trailerScaleSlider = document.getElementById('trailerScaleSlider');
+        const trailerScaleVal = document.getElementById('trailerScaleVal');
 
-        // Event Listeners for Parameter Tuning
+        // Event Listeners
         maxSpeedSlider.addEventListener('input', (e) => {
             devSettings.maxSpeed = parseFloat(e.target.value);
             maxSpeedVal.textContent = devSettings.maxSpeed.toFixed(1);
         });
-
         reverseSlider.addEventListener('input', (e) => {
             devSettings.maxBackwardsSpeed = parseFloat(e.target.value);
             reverseVal.textContent = devSettings.maxBackwardsSpeed.toFixed(1);
         });
-
         trailerLengthSlider.addEventListener('input', (e) => {
             devSettings.trailerLength = parseInt(e.target.value);
             trailerLengthVal.textContent = devSettings.trailerLength;
-            trailer.length = devSettings.trailerLength; 
         });
-
         frictionSlider.addEventListener('input', (e) => {
             devSettings.jointFriction = parseFloat(e.target.value);
             frictionVal.textContent = devSettings.jointFriction.toFixed(2);
         });
+        carScaleSlider.addEventListener('input', (e) => {
+            devSettings.carScale = parseFloat(e.target.value);
+            carScaleVal.textContent = devSettings.carScale.toFixed(1);
+        });
+        trailerScaleSlider.addEventListener('input', (e) => {
+            devSettings.trailerScale = parseFloat(e.target.value);
+            trailerScaleVal.textContent = devSettings.trailerScale.toFixed(1);
+        });
 
         // Keyboard System
         const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        window.addEventListener('keydown', (e) => { if (e.key in keys) { keys[e.key] = true; e.preventDefault(); } });
+        window.addEventListener('keyup', (e) => { if (e.key in keys) { keys[e.key] = false; e.preventDefault(); } });
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key in keys) { keys[e.key] = true; e.preventDefault(); }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (e.key in keys) { keys[e.key] = false; e.preventDefault(); }
-        });
-
-        // Vehicle Specifications
+        // Base Vehicle Specifications
         const car = {
             x: canvas.width / 2 + 50,
             y: canvas.height / 2,
             heading: 0,          
             speed: 0,
             steerAngle: 0,       
-
-            length: 70,          
+            length: 70, // Base wheelbase         
             width: 50,           
             wheelLength: 20,
             wheelWidth: 8,
-
             acceleration: 0.12,
             deceleration: 0.08,
             friction: 0.04,
@@ -230,13 +248,11 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             steerReturnSpeed: 0.06
         };
 
-        // Trailer Specifications
+        // Base Trailer Specifications
         const trailer = {
             x: (canvas.width / 2 + 50) - 65, 
             y: canvas.height / 2,
             heading: 0,
-
-            length: devSettings.trailerLength,          
             width: 54,           
             wheelLength: 22,
             wheelWidth: 9
@@ -255,6 +271,10 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
         }
 
         function updatePhysics() {
+            // Compute current scaled lengths for real-time physics simulation
+            const currentCarLength = car.length * devSettings.carScale;
+            const currentTrailerLength = devSettings.trailerLength * devSettings.trailerScale;
+
             // 1. Acceleration / Braking
             if (keys.ArrowUp) {
                 if (car.speed < devSettings.maxSpeed) car.speed += car.acceleration;
@@ -268,7 +288,7 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             if (car.speed > devSettings.maxSpeed) car.speed = devSettings.maxSpeed;
             if (car.speed < devSettings.maxBackwardsSpeed) car.speed = devSettings.maxBackwardsSpeed;
 
-            // 2. Front Axis Steering Mechanics
+            // 2. Front Axis Steering
             if (keys.ArrowLeft) {
                 car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - car.steerSpeed);
             } else if (keys.ArrowRight) {
@@ -278,10 +298,10 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
                 else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
             }
 
-            // 3. Translate Position Coordinates 
+            // 3. Update Position & Heading (Wheelbase physics scales with car size)
             car.x += car.speed * Math.cos(car.heading);
             car.y += car.speed * Math.sin(car.heading);
-            car.heading += (car.speed * Math.tan(car.steerAngle)) / car.length;
+            car.heading += (car.speed * Math.tan(car.steerAngle)) / currentCarLength;
 
             // 4. Trailer Dynamic Tracking Engine
             const hitchX = car.x;
@@ -292,17 +312,17 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
 
             const targetHeading = Math.atan2(dy, dx);
             let angleDiff = targetHeading - trailer.heading;
-            
             angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
 
             const rigidityFactor = 1 - devSettings.jointFriction;
             trailer.heading += angleDiff * rigidityFactor;
 
-            trailer.x = hitchX - trailer.length * Math.cos(trailer.heading);
-            trailer.y = hitchY - trailer.length * Math.sin(trailer.heading);
+            // Maintain exact distance based on scaled structural length
+            trailer.x = hitchX - currentTrailerLength * Math.cos(trailer.heading);
+            trailer.y = hitchY - currentTrailerLength * Math.sin(trailer.heading);
 
             // 5. Boundary Collisions
-            const margin = car.length;
+            const margin = currentCarLength;
             if (car.x < margin) { car.x = margin; car.speed = 0; }
             if (car.x > canvas.width - margin) { car.x = canvas.width - margin; car.speed = 0; }
             if (car.y < margin) { car.y = margin; car.speed = 0; }
@@ -323,8 +343,9 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
 
         function drawCar() {
             ctx.save();
-            ctx.translate(car.x, car.y);
+            ctx.translate(car.x, car.y); // Translate to pivot (rear axle center/hitch)
             ctx.rotate(car.heading);
+            ctx.scale(devSettings.carScale, devSettings.carScale); // Scale relative to the rear axle pivot
 
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 4;
@@ -337,16 +358,14 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
             // Front Axis
             ctx.beginPath(); ctx.moveTo(car.length, -car.width / 2); ctx.lineTo(car.length, car.width / 2); ctx.stroke();
 
-            // Intersecting Node Indicators
+            // Joint Node Indicators
             ctx.fillStyle = '#ff5252';
             ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(car.length, 0, 4, 0, Math.PI * 2); ctx.fill();
 
-            // Rear Wheels
+            // Wheels
             drawWheel(0, -car.width / 2, 0, car.wheelWidth, car.wheelLength);
             drawWheel(0, car.width / 2, 0, car.wheelWidth, car.wheelLength);
-            
-            // Front Steering Wheels
             drawWheel(car.length, -car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
             drawWheel(car.length, car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
 
@@ -355,19 +374,20 @@ Here is the fully corrected, working code with that typo fixed (`stroke()` chang
 
         function drawTrailer() {
             ctx.save();
-            ctx.translate(trailer.x, trailer.y);
+            ctx.translate(trailer.x, trailer.y); // Translate to pivot (trailer axle center)
             ctx.rotate(trailer.heading);
+            ctx.scale(devSettings.trailerScale, devSettings.trailerScale); // Scale relative to trailer axle pivot
 
             ctx.strokeStyle = '#4fc3f7'; 
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // Structural Towing Bar
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(trailer.length, 0); ctx.stroke();
-            // Integrated Single Supporting Axle Beam
-            ctx.beginPath(); ctx.moveTo(0, -trailer.width / 2); ctx.lineTo(0, trailer.width / 2); ctx.stroke(); // Fixed typo here!
+            // Structural Towing Bar (Length drawn matching devSettings slider)
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(devSettings.trailerLength, 0); ctx.stroke();
+            // Axle Beam
+            ctx.beginPath(); ctx.moveTo(0, -trailer.width / 2); ctx.lineTo(0, trailer.width / 2); ctx.stroke();
 
-            // Geometric Box Structure
+            // Geometric Box Frame
             ctx.strokeStyle = 'rgba(79, 195, 247, 0.3)';
             ctx.lineWidth = 2;
             ctx.strokeRect(-15, -trailer.width / 2, 35, trailer.width);
