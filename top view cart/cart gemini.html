@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vehicle & Trailer Simulation - Wide Layout</title>
+    <title>2D Vehicle & Trailer Simulation - Level Edit Mode</title>
     <style>
         body {
             margin: 0;
@@ -17,6 +16,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #ffffff;
             overflow: hidden;
+            user-select: none;
         }
 
         /* Compact Single-Line Header Area */
@@ -50,11 +50,11 @@
             display: flex;
             flex-direction: row;
             width: 100vw;
-            height: calc(100vh - 35px); /* Take up remaining vertical space */
+            height: calc(100vh - 35px);
             background-color: #222;
         }
 
-        /* Wider Game Canvas Panel */
+        /* Main Canvas Viewport */
         .canvas-container {
             flex: 1;
             display: flex;
@@ -63,6 +63,7 @@
             background-color: #1a1a1a;
             padding: 0;
             margin: 0;
+            position: relative;
         }
 
         canvas {
@@ -75,7 +76,7 @@
             max-height: 760px;
         }
 
-        /* Ultra Narrow Developer Panel */
+        /* Ultra-Narrow Developer Panel */
         .dev-panel {
             width: 190px;
             background-color: #141414;
@@ -83,7 +84,7 @@
             border-left: 1px solid #333;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             box-sizing: border-box;
             overflow-y: auto;
         }
@@ -96,6 +97,56 @@
             letter-spacing: 0.5px;
             border-bottom: 1px solid #2a2a2a;
             padding-bottom: 4px;
+        }
+
+        /* Editor Control Buttons */
+        .mode-btn {
+            width: 100%;
+            padding: 8px 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-btn.drive-mode {
+            background-color: #00e676;
+            color: #000;
+        }
+
+        .mode-btn.drive-mode:hover {
+            background-color: #00c853;
+        }
+
+        .mode-btn.edit-mode {
+            background-color: #ff9100;
+            color: #000;
+            box-shadow: 0 0 8px rgba(255, 145, 0, 0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .sub-btn {
+            flex: 1;
+            padding: 5px;
+            background-color: #2a2a2a;
+            color: #ccc;
+            border: 1px solid #444;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .sub-btn:hover {
+            background-color: #3a3a3a;
+            color: #fff;
         }
 
         .control-group {
@@ -134,20 +185,34 @@
 </head>
 <body>
 
+    <!-- Header Strip -->
     <div class="header-strip">
         <h1>Vehicle & Trailer Sandbox</h1>
         <div class="instructions">
-            Controls: <b>Up/Down Arrows</b> to drive, <b>Left/Right Arrows</b> to steer.
+            Drive: <b>Up/Down Arrows</b> | Steer: <b>Left/Right Arrows</b>
         </div>
     </div>
 
+    <!-- Full Width Container -->
     <div class="game-container">
         
+        <!-- Canvas Game Viewport -->
         <div class="canvas-container">
             <canvas id="gameCanvas" width="1150" height="760"></canvas>
         </div>
 
+        <!-- Narrow Developer Panel -->
         <div class="dev-panel">
+            <h2>Level Editor</h2>
+            
+            <button id="modeToggleBtn" class="mode-btn drive-mode">Drive Mode</button>
+            
+            <div class="btn-group">
+                <button id="undoObstacleBtn" class="sub-btn">Undo Box</button>
+                <button id="clearObstaclesBtn" class="sub-btn">Clear All</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
             <h2>Physics Tuning</h2>
             
             <div class="control-group">
@@ -186,7 +251,6 @@
                     Vehicle Scale: <span id="carScaleVal">1.0</span>x
                 </label>
                 <input type="range" id="carScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
-                <div class="note">Scales from rear hitch point.</div>
             </div>
 
             <div class="control-group">
@@ -194,7 +258,6 @@
                     Trailer Scale: <span id="trailerScaleVal">1.0</span>x
                 </label>
                 <input type="range" id="trailerScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
-                <div class="note">Scales from trailer axle center.</div>
             </div>
         </div>
     </div>
@@ -210,10 +273,26 @@
             trailerLength: 65,
             jointFriction: 0.00,
             carScale: 1.0,
-            trailerScale: 1.0
+            trailerScale: 1.0,
+            editMode: false
         };
 
+        // Obstacles Array (Solid Rectangles)
+        const obstacles = [
+            { x: 300, y: 180, width: 220, height: 40 },
+            { x: 700, y: 350, width: 40, height: 260 },
+            { x: 400, y: 500, width: 180, height: 50 }
+        ];
+
+        // Drawing Interaction State
+        let isDrawing = false;
+        let drawStart = { x: 0, y: 0 };
+        let currentMouse = { x: 0, y: 0 };
+
         // DOM Element Mapping
+        const modeToggleBtn = document.getElementById('modeToggleBtn');
+        const undoObstacleBtn = document.getElementById('undoObstacleBtn');
+        const clearObstaclesBtn = document.getElementById('clearObstaclesBtn');
         const maxSpeedSlider = document.getElementById('maxSpeedSlider');
         const maxSpeedVal = document.getElementById('maxSpeedVal');
         const reverseSlider = document.getElementById('reverseSpeedSlider');
@@ -227,7 +306,27 @@
         const trailerScaleSlider = document.getElementById('trailerScaleSlider');
         const trailerScaleVal = document.getElementById('trailerScaleVal');
 
-        // Event Linkage Loops
+        // Mode Switching
+        modeToggleBtn.addEventListener('click', toggleEditMode);
+
+        function toggleEditMode() {
+            devSettings.editMode = !devSettings.editMode;
+            if (devSettings.editMode) {
+                modeToggleBtn.textContent = 'Edit Mode';
+                modeToggleBtn.className = 'mode-btn edit-mode';
+                canvas.style.cursor = 'crosshair';
+            } else {
+                modeToggleBtn.textContent = 'Drive Mode';
+                modeToggleBtn.className = 'mode-btn drive-mode';
+                canvas.style.cursor = 'default';
+                isDrawing = false;
+            }
+        }
+
+        undoObstacleBtn.addEventListener('click', () => obstacles.pop());
+        clearObstaclesBtn.addEventListener('click', () => obstacles.length = 0);
+
+        // Parameter Sliders
         maxSpeedSlider.addEventListener('input', (e) => {
             devSettings.maxSpeed = parseFloat(e.target.value);
             maxSpeedVal.textContent = devSettings.maxSpeed.toFixed(1);
@@ -253,15 +352,70 @@
             trailerScaleVal.textContent = devSettings.trailerScale.toFixed(1);
         });
 
-        // Keyboard System Map
+        // Mouse Handling for Level Editor
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!devSettings.editMode) return;
+            const pos = getCanvasMousePos(e);
+
+            if (e.button === 0) { // Left-click: Start drawing
+                isDrawing = true;
+                drawStart = pos;
+                currentMouse = pos;
+            } else if (e.button === 2) { // Right-click: Delete obstacle
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const ob = obstacles[i];
+                    if (pos.x >= ob.x && pos.x <= ob.x + ob.width &&
+                        pos.y >= ob.y && pos.y <= ob.y + ob.height) {
+                        obstacles.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (devSettings.editMode && isDrawing) {
+                currentMouse = getCanvasMousePos(e);
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (devSettings.editMode && isDrawing && e.button === 0) {
+                const pos = getCanvasMousePos(e);
+                const rx = Math.min(drawStart.x, pos.x);
+                const ry = Math.min(drawStart.y, pos.y);
+                const rw = Math.abs(pos.x - drawStart.x);
+                const rh = Math.abs(pos.y - drawStart.y);
+
+                // Ignore tiny accidental clicks
+                if (rw > 10 && rh > 10) {
+                    obstacles.push({ x: rx, y: ry, width: rw, height: rh });
+                }
+                isDrawing = false;
+            }
+        });
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Keyboard Inputs
         const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
         window.addEventListener('keydown', (e) => { if (e.key in keys) { keys[e.key] = true; e.preventDefault(); } });
         window.addEventListener('keyup', (e) => { if (e.key in keys) { keys[e.key] = false; e.preventDefault(); } });
 
-        // Base Structural Profiles
+        // Base Kinematics Specifications
         const car = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
+            x: 200,
+            y: 380,
             heading: 0,          
             speed: 0,
             steerAngle: 0,       
@@ -278,8 +432,8 @@
         };
 
         const trailer = {
-            x: (canvas.width / 2) - 65, 
-            y: canvas.height / 2,
+            x: 135, 
+            y: 380,
             heading: 0,
             width: 54,           
             wheelLength: 22,
@@ -298,11 +452,66 @@
             }
         }
 
+        // Transforms local entity points into global world space coordinates
+        function getTransformedPoints(originX, originY, heading, scale, localPoints) {
+            const cos = Math.cos(heading);
+            const sin = Math.sin(heading);
+            return localPoints.map(pt => ({
+                x: originX + (pt.x * scale * cos - pt.y * scale * sin),
+                y: originY + (pt.x * scale * sin + pt.y * scale * cos)
+            }));
+        }
+
+        // Obstacle Collision Detector (Points vs AABB Boxes)
+        function checkCollisions() {
+            // Local collision sample points for Car
+            const carLocalPoints = [
+                { x: 0, y: -car.width / 2 },
+                { x: 0, y: car.width / 2 },
+                { x: car.length, y: -car.width / 2 },
+                { x: car.length, y: car.width / 2 },
+                { x: car.length / 2, y: -car.width / 2 },
+                { x: car.length / 2, y: car.width / 2 },
+                { x: car.length, y: 0 },
+                { x: 0, y: 0 }
+            ];
+
+            // Local collision sample points for Trailer
+            const trailerLocalPoints = [
+                { x: -15, y: -trailer.width / 2 },
+                { x: -15, y: trailer.width / 2 },
+                { x: devSettings.trailerLength, y: 0 },
+                { x: 0, y: -trailer.width / 2 },
+                { x: 0, y: trailer.width / 2 },
+                { x: devSettings.trailerLength / 2, y: -trailer.width / 2 },
+                { x: devSettings.trailerLength / 2, y: trailer.width / 2 }
+            ];
+
+            const carWorldPoints = getTransformedPoints(car.x, car.y, car.heading, devSettings.carScale, carLocalPoints);
+            const trailerWorldPoints = getTransformedPoints(trailer.x, trailer.y, trailer.heading, devSettings.trailerScale, trailerLocalPoints);
+
+            const allPoints = [...carWorldPoints, ...trailerWorldPoints];
+
+            for (const pt of allPoints) {
+                for (const ob of obstacles) {
+                    if (pt.x >= ob.x && pt.x <= ob.x + ob.width &&
+                        pt.y >= ob.y && pt.y <= ob.y + ob.height) {
+                        return true; // Collision detected
+                    }
+                }
+            }
+            return false;
+        }
+
         function updatePhysics() {
+            // Save state for solid collision reversal
+            const prevCar = { x: car.x, y: car.y, heading: car.heading };
+            const prevTrailer = { x: trailer.x, y: trailer.y, heading: trailer.heading };
+
             const currentCarLength = car.length * devSettings.carScale;
             const currentTrailerLength = devSettings.trailerLength * devSettings.trailerScale;
 
-            // 1. Acceleration Profiles
+            // 1. Driving Acceleration
             if (keys.ArrowUp) {
                 if (car.speed < devSettings.maxSpeed) car.speed += car.acceleration;
             } else if (keys.ArrowDown) {
@@ -315,7 +524,7 @@
             if (car.speed > devSettings.maxSpeed) car.speed = devSettings.maxSpeed;
             if (car.speed < devSettings.maxBackwardsSpeed) car.speed = devSettings.maxBackwardsSpeed;
 
-            // 2. Steer Angle Normalizations
+            // 2. Steering Controls
             if (keys.ArrowLeft) {
                 car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - car.steerSpeed);
             } else if (keys.ArrowRight) {
@@ -325,12 +534,12 @@
                 else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
             }
 
-            // 3. Translate Master Positions
+            // 3. Movement Integration
             car.x += car.speed * Math.cos(car.heading);
             car.y += car.speed * Math.sin(car.heading);
             car.heading += (car.speed * Math.tan(car.steerAngle)) / currentCarLength;
 
-            // 4. Kinematic Constraint Resolution Loop
+            // 4. Trailer Kinematics
             const hitchX = car.x;
             const hitchY = car.y;
 
@@ -347,12 +556,56 @@
             trailer.x = hitchX - currentTrailerLength * Math.cos(trailer.heading);
             trailer.y = hitchY - currentTrailerLength * Math.sin(trailer.heading);
 
-            // 5. Screen Bound Wraps / Blocks
+            // 5. Canvas Boundary Checks
             const margin = currentCarLength;
-            if (car.x < margin) { car.x = margin; car.speed = 0; }
-            if (car.x > canvas.width - margin) { car.x = canvas.width - margin; car.speed = 0; }
-            if (car.y < margin) { car.y = margin; car.speed = 0; }
-            if (car.y > canvas.height - margin) { car.y = canvas.height - margin; car.speed = 0; }
+            if (car.x < margin) car.x = margin;
+            if (car.x > canvas.width - margin) car.x = canvas.width - margin;
+            if (car.y < margin) car.y = margin;
+            if (car.y > canvas.height - margin) car.y = canvas.height - margin;
+
+            // 6. Solid Obstacle Collisions
+            if (checkCollisions()) {
+                car.x = prevCar.x;
+                car.y = prevCar.y;
+                car.heading = prevCar.heading;
+                trailer.x = prevTrailer.x;
+                trailer.y = prevTrailer.y;
+                trailer.heading = prevTrailer.heading;
+                car.speed = 0; // Stop on impact
+            }
+        }
+
+        function drawObstacles() {
+            // Render existing solid rectangles
+            for (const ob of obstacles) {
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+                
+                ctx.strokeStyle = '#4fc3f7';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ob.x, ob.y, ob.width, ob.height);
+
+                // Subtle inner grid texture for obstacles
+                ctx.fillStyle = 'rgba(79, 195, 247, 0.08)';
+                ctx.fillRect(ob.x + 3, ob.y + 3, ob.width - 6, ob.height - 6);
+            }
+
+            // Render active drawing box in Edit Mode
+            if (devSettings.editMode && isDrawing) {
+                const rx = Math.min(drawStart.x, currentMouse.x);
+                const ry = Math.min(drawStart.y, currentMouse.y);
+                const rw = Math.abs(currentMouse.x - drawStart.x);
+                const rh = Math.abs(currentMouse.y - drawStart.y);
+
+                ctx.fillStyle = 'rgba(255, 145, 0, 0.2)';
+                ctx.fillRect(rx, ry, rw, rh);
+                
+                ctx.strokeStyle = '#ff9100';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.strokeRect(rx, ry, rw, rh);
+                ctx.setLineDash([]);
+            }
         }
 
         function drawWheel(x, y, angle, width, length, color = '#00e676') {
@@ -377,7 +630,7 @@
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // Central spine structure
+            // Central chassis spine
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(car.length, 0); ctx.stroke();
             // Axles
             ctx.beginPath(); ctx.moveTo(0, -car.width / 2); ctx.lineTo(0, car.width / 2); ctx.stroke();
@@ -388,7 +641,7 @@
             ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(car.length, 0, 4, 0, Math.PI * 2); ctx.fill();
 
-            // Wheels Assemblies
+            // Wheel Assemblies
             drawWheel(0, -car.width / 2, 0, car.wheelWidth, car.wheelLength);
             drawWheel(0, car.width / 2, 0, car.wheelWidth, car.wheelLength);
             drawWheel(car.length, -car.width / 2, car.steerAngle, car.wheelWidth, car.wheelLength);
@@ -407,17 +660,17 @@
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
-            // Hitch Drawbar Tongue
+            // Towing Drawbar
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(devSettings.trailerLength, 0); ctx.stroke();
-            // Main Axle Bar
+            // Axle Beam
             ctx.beginPath(); ctx.moveTo(0, -trailer.width / 2); ctx.lineTo(0, trailer.width / 2); ctx.stroke();
 
-            // Minimalist Cargo Platform Frame
+            // Platform Outline
             ctx.strokeStyle = 'rgba(79, 195, 247, 0.25)';
             ctx.lineWidth = 1.5;
             ctx.strokeRect(-15, -trailer.width / 2, 35, trailer.width);
 
-            // Ground Track Wheel Configurations
+            // Trailer Wheels
             drawWheel(0, -trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d');
             drawWheel(0, trailer.width / 2, 0, trailer.wheelWidth, trailer.wheelLength, '#ffb74d');
 
@@ -434,12 +687,20 @@
             
             ctx.fillStyle = Math.abs(relativeAngle) > 50 ? '#ff5252' : '#666';
             ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}°`, 15, 42);
+
+            // Editor Banner Overlay
+            if (devSettings.editMode) {
+                ctx.fillStyle = '#ff9100';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillText(`[LEVEL EDIT MODE] Left-Click & Drag to create rects | Right-Click rect to delete`, 15, canvas.height - 15);
+            }
         }
 
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawGrid();
             updatePhysics();
+            drawObstacles();
             drawTrailer();
             drawCar();
             drawHUD();
@@ -450,5 +711,3 @@
     </script>
 </body>
 </html>
-
-```
