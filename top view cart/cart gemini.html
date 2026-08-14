@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vehicle & Trailer Simulation - Level Edit Mode</title>
+    <title>2D Vehicle & Trailer Simulation - Rear Boom Edition</title>
     <style>
         body {
             margin: 0;
@@ -19,7 +19,7 @@
             user-select: none;
         }
 
-        /* Compact Single-Line Header Area */
+        /* Compact Header Strip */
         .header-strip {
             display: flex;
             flex-direction: row;
@@ -45,7 +45,7 @@
             color: #aaaaaa;
         }
 
-        /* Maximized Edge-to-Edge Grid Layout */
+        /* Maximized Edge-to-Edge Container */
         .game-container {
             display: flex;
             flex-direction: row;
@@ -54,7 +54,7 @@
             background-color: #222;
         }
 
-        /* Main Canvas Viewport */
+        /* Canvas Viewport */
         .canvas-container {
             flex: 1;
             display: flex;
@@ -76,7 +76,7 @@
             max-height: 760px;
         }
 
-        /* Ultra-Narrow Developer Panel */
+        /* Sidebar Developer Panel */
         .dev-panel {
             width: 190px;
             background-color: #141414;
@@ -99,7 +99,6 @@
             padding-bottom: 4px;
         }
 
-        /* Editor Control Buttons */
         .mode-btn {
             width: 100%;
             padding: 8px 4px;
@@ -173,13 +172,6 @@
             accent-color: #4fc3f7;
             cursor: pointer;
             margin: 2px 0;
-        }
-
-        .note {
-            font-size: 0.68rem;
-            color: #666;
-            font-style: italic;
-            line-height: 1.2;
         }
     </style>
 </head>
@@ -277,14 +269,14 @@
             editMode: false
         };
 
-        // Obstacles Array (Solid Rectangles)
+        // Solid Level Obstacles
         const obstacles = [
             { x: 300, y: 180, width: 220, height: 40 },
-            { x: 700, y: 350, width: 40, height: 260 },
-            { x: 400, y: 500, width: 180, height: 50 }
+            { x: 750, y: 350, width: 40, height: 260 },
+            { x: 400, y: 520, width: 180, height: 50 }
         ];
 
-        // Drawing Interaction State
+        // Interaction State
         let isDrawing = false;
         let drawStart = { x: 0, y: 0 };
         let currentMouse = { x: 0, y: 0 };
@@ -326,7 +318,7 @@
         undoObstacleBtn.addEventListener('click', () => obstacles.pop());
         clearObstaclesBtn.addEventListener('click', () => obstacles.length = 0);
 
-        // Parameter Sliders
+        // Parameter Adjustments
         maxSpeedSlider.addEventListener('input', (e) => {
             devSettings.maxSpeed = parseFloat(e.target.value);
             maxSpeedVal.textContent = devSettings.maxSpeed.toFixed(1);
@@ -367,11 +359,11 @@
             if (!devSettings.editMode) return;
             const pos = getCanvasMousePos(e);
 
-            if (e.button === 0) { // Left-click: Start drawing
+            if (e.button === 0) { // Left-click: Start box draw
                 isDrawing = true;
                 drawStart = pos;
                 currentMouse = pos;
-            } else if (e.button === 2) { // Right-click: Delete obstacle
+            } else if (e.button === 2) { // Right-click: Delete target box
                 for (let i = obstacles.length - 1; i >= 0; i--) {
                     const ob = obstacles[i];
                     if (pos.x >= ob.x && pos.x <= ob.x + ob.width &&
@@ -397,7 +389,6 @@
                 const rw = Math.abs(pos.x - drawStart.x);
                 const rh = Math.abs(pos.y - drawStart.y);
 
-                // Ignore tiny accidental clicks
                 if (rw > 10 && rh > 10) {
                     obstacles.push({ x: rx, y: ry, width: rw, height: rh });
                 }
@@ -412,9 +403,9 @@
         window.addEventListener('keydown', (e) => { if (e.key in keys) { keys[e.key] = true; e.preventDefault(); } });
         window.addEventListener('keyup', (e) => { if (e.key in keys) { keys[e.key] = false; e.preventDefault(); } });
 
-        // Base Kinematics Specifications
+        // Base Kinematic Profiles
         const car = {
-            x: 200,
+            x: 250,
             y: 380,
             heading: 0,          
             speed: 0,
@@ -432,7 +423,7 @@
         };
 
         const trailer = {
-            x: 135, 
+            x: 185, 
             y: 380,
             heading: 0,
             width: 54,           
@@ -452,7 +443,6 @@
             }
         }
 
-        // Transforms local entity points into global world space coordinates
         function getTransformedPoints(originX, originY, heading, scale, localPoints) {
             const cos = Math.cos(heading);
             const sin = Math.sin(heading);
@@ -462,9 +452,9 @@
             }));
         }
 
-        // Obstacle Collision Detector (Points vs AABB Boxes)
+        // Collision Engine (Polygon Points + Round Rear Boom Circle)
         function checkCollisions() {
-            // Local collision sample points for Car
+            // 1. Vehicle Collision Points
             const carLocalPoints = [
                 { x: 0, y: -car.width / 2 },
                 { x: 0, y: car.width / 2 },
@@ -476,7 +466,7 @@
                 { x: 0, y: 0 }
             ];
 
-            // Local collision sample points for Trailer
+            // 2. Trailer Chassis Points
             const trailerLocalPoints = [
                 { x: -15, y: -trailer.width / 2 },
                 { x: -15, y: trailer.width / 2 },
@@ -496,15 +486,35 @@
                 for (const ob of obstacles) {
                     if (pt.x >= ob.x && pt.x <= ob.x + ob.width &&
                         pt.y >= ob.y && pt.y <= ob.y + ob.height) {
-                        return true; // Collision detected
+                        return true; 
                     }
                 }
             }
+
+            // 3. Round Boom Circle-vs-Rect Collision Check
+            // Diameter is tied to trailer.width (Radius = trailer.width / 2)
+            const boomRadiusLocal = trailer.width / 2;
+            const boomRadiusWorld = boomRadiusLocal * devSettings.trailerScale;
+            
+            // Boom center local offset is -boomRadiusLocal along local X axis (behind wheels)
+            const boomCenterXWorld = trailer.x + (-boomRadiusLocal * devSettings.trailerScale) * Math.cos(trailer.heading);
+            const boomCenterYWorld = trailer.y + (-boomRadiusLocal * devSettings.trailerScale) * Math.sin(trailer.heading);
+
+            for (const ob of obstacles) {
+                const closestX = Math.max(ob.x, Math.min(boomCenterXWorld, ob.x + ob.width));
+                const closestY = Math.max(ob.y, Math.min(boomCenterYWorld, ob.y + ob.height));
+
+                const distX = boomCenterXWorld - closestX;
+                const distY = boomCenterYWorld - closestY;
+                if ((distX * distX + distY * distY) <= (boomRadiusWorld * boomRadiusWorld)) {
+                    return true;
+                }
+            }
+
             return false;
         }
 
         function updatePhysics() {
-            // Save state for solid collision reversal
             const prevCar = { x: car.x, y: car.y, heading: car.heading };
             const prevTrailer = { x: trailer.x, y: trailer.y, heading: trailer.heading };
 
@@ -534,12 +544,12 @@
                 else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
             }
 
-            // 3. Movement Integration
+            // 3. Movement Physics Integration
             car.x += car.speed * Math.cos(car.heading);
             car.y += car.speed * Math.sin(car.heading);
             car.heading += (car.speed * Math.tan(car.steerAngle)) / currentCarLength;
 
-            // 4. Trailer Kinematics
+            // 4. Trailer Kinematic Constraint Resolution
             const hitchX = car.x;
             const hitchY = car.y;
 
@@ -556,14 +566,14 @@
             trailer.x = hitchX - currentTrailerLength * Math.cos(trailer.heading);
             trailer.y = hitchY - currentTrailerLength * Math.sin(trailer.heading);
 
-            // 5. Canvas Boundary Checks
+            // 5. Screen Edge Boundaries
             const margin = currentCarLength;
             if (car.x < margin) car.x = margin;
             if (car.x > canvas.width - margin) car.x = canvas.width - margin;
             if (car.y < margin) car.y = margin;
             if (car.y > canvas.height - margin) car.y = canvas.height - margin;
 
-            // 6. Solid Obstacle Collisions
+            // 6. Solid Obstacle Impact Resolution
             if (checkCollisions()) {
                 car.x = prevCar.x;
                 car.y = prevCar.y;
@@ -571,12 +581,11 @@
                 trailer.x = prevTrailer.x;
                 trailer.y = prevTrailer.y;
                 trailer.heading = prevTrailer.heading;
-                car.speed = 0; // Stop on impact
+                car.speed = 0;
             }
         }
 
         function drawObstacles() {
-            // Render existing solid rectangles
             for (const ob of obstacles) {
                 ctx.fillStyle = '#2c3e50';
                 ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
@@ -585,12 +594,10 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(ob.x, ob.y, ob.width, ob.height);
 
-                // Subtle inner grid texture for obstacles
                 ctx.fillStyle = 'rgba(79, 195, 247, 0.08)';
                 ctx.fillRect(ob.x + 3, ob.y + 3, ob.width - 6, ob.height - 6);
             }
 
-            // Render active drawing box in Edit Mode
             if (devSettings.editMode && isDrawing) {
                 const rx = Math.min(drawStart.x, currentMouse.x);
                 const ry = Math.min(drawStart.y, currentMouse.y);
@@ -656,13 +663,57 @@
             ctx.rotate(trailer.heading);
             ctx.scale(devSettings.trailerScale, devSettings.trailerScale); 
 
+            const L = devSettings.trailerLength;
+            // Radius is set proportional to trailer.width (Diameter = trailer.width)
+            const R = trailer.width / 2; 
+            const boomCenterX = -R; // Positioned directly behind the wheel axle (0,0)
+
+            // 1. REAR BOOM STRUCTURE (Hovering above ground attached to chassis)
+            // Structural mounting struts from axle center to boom
+            ctx.strokeStyle = '#ff9100';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, -trailer.width / 3);
+            ctx.lineTo(boomCenterX, 0);
+            ctx.moveTo(0, trailer.width / 3);
+            ctx.lineTo(boomCenterX, 0);
+            ctx.stroke();
+
+            // Outer Round Boom Ring
+            ctx.fillStyle = 'rgba(255, 145, 0, 0.15)';
+            ctx.beginPath();
+            ctx.arc(boomCenterX, 0, R, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#ff9100';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(boomCenterX, 0, R, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Internal Structural Lattice
+            ctx.strokeStyle = 'rgba(255, 145, 0, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(boomCenterX, 0, R * 0.5, 0, Math.PI * 2);
+            ctx.moveTo(boomCenterX - R, 0); ctx.lineTo(boomCenterX + R, 0);
+            ctx.moveTo(boomCenterX, -R); ctx.lineTo(boomCenterX, R);
+            ctx.stroke();
+
+            // Central Boom Hub Joint
+            ctx.fillStyle = '#ff9100';
+            ctx.beginPath();
+            ctx.arc(boomCenterX, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. MAIN TRAILER FRAME & AXLE
             ctx.strokeStyle = '#4fc3f7'; 
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
 
             // Towing Drawbar
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(devSettings.trailerLength, 0); ctx.stroke();
-            // Axle Beam
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(L, 0); ctx.stroke();
+            // Main Axle Bar
             ctx.beginPath(); ctx.moveTo(0, -trailer.width / 2); ctx.lineTo(0, trailer.width / 2); ctx.stroke();
 
             // Platform Outline
@@ -688,7 +739,6 @@
             ctx.fillStyle = Math.abs(relativeAngle) > 50 ? '#ff5252' : '#666';
             ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}°`, 15, 42);
 
-            // Editor Banner Overlay
             if (devSettings.editMode) {
                 ctx.fillStyle = '#ff9100';
                 ctx.font = 'bold 13px sans-serif';
