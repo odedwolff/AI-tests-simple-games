@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vehicle & Trailer Simulation - Rear Boom Edition</title>
+    <title>2D Vehicle & Trailer Simulation - Synchronized Settings</title>
     <style>
         body {
             margin: 0;
@@ -78,7 +78,7 @@
 
         /* Sidebar Developer Panel */
         .dev-panel {
-            width: 190px;
+            width: 200px;
             background-color: #141414;
             padding: 12px;
             border-left: 1px solid #333;
@@ -193,7 +193,7 @@
             <canvas id="gameCanvas" width="1150" height="760"></canvas>
         </div>
 
-        <!-- Narrow Developer Panel -->
+        <!-- Developer Panel -->
         <div class="dev-panel">
             <h2>Level Editor</h2>
             
@@ -205,25 +205,45 @@
             </div>
 
             <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
-            <h2>Physics Tuning</h2>
+            <h2>Level Storage</h2>
+
+            <div class="btn-group">
+                <button id="saveLocalBtn" class="sub-btn">Save Local</button>
+                <button id="loadLocalBtn" class="sub-btn">Load Local</button>
+            </div>
+            <div class="btn-group">
+                <button id="exportJsonBtn" class="sub-btn">Export JSON</button>
+                <button id="importJsonBtn" class="sub-btn">Import JSON</button>
+            </div>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+            <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
+            <h2>Safety & Physics</h2>
+
+            <div class="control-group">
+                <label>
+                    Jackknife Guard: <span id="jackknifeVal">ON</span>
+                </label>
+                <button id="jackknifeToggleBtn" class="sub-btn">Enabled</button>
+            </div>
             
             <div class="control-group">
                 <label for="maxSpeedSlider">
-                    Fwd Speed: <span id="maxSpeedVal">4.5</span>
+                    Fwd Speed: <span id="maxSpeedVal">0.0</span>
                 </label>
                 <input type="range" id="maxSpeedSlider" min="1.0" max="10.0" step="0.1" value="4.5">
             </div>
 
             <div class="control-group">
                 <label for="reverseSpeedSlider">
-                    Rev Speed: <span id="reverseSpeedVal">-2.0</span>
+                    Rev Speed: <span id="reverseSpeedVal">0.0</span>
                 </label>
                 <input type="range" id="reverseSpeedSlider" min="-5.0" max="-0.5" step="0.1" value="-2.0">
             </div>
 
             <div class="control-group">
                 <label for="trailerLengthSlider">
-                    Trailer Len: <span id="trailerLengthVal">65</span>px
+                    Trailer Len: <span id="trailerLengthVal">0</span>px
                 </label>
                 <input type="range" id="trailerLengthSlider" min="30" max="150" step="5" value="65">
             </div>
@@ -240,14 +260,14 @@
 
             <div class="control-group">
                 <label for="carScaleSlider">
-                    Vehicle Scale: <span id="carScaleVal">1.0</span>x
+                    Vehicle Scale: <span id="carScaleVal">0.0</span>x
                 </label>
                 <input type="range" id="carScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
             </div>
 
             <div class="control-group">
                 <label for="trailerScaleSlider">
-                    Trailer Scale: <span id="trailerScaleVal">1.0</span>x
+                    Trailer Scale: <span id="trailerScaleVal">0.0</span>x
                 </label>
                 <input type="range" id="trailerScaleSlider" min="0.4" max="2.5" step="0.1" value="1.0">
             </div>
@@ -258,19 +278,21 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Dynamic Configuration State
+        // Central Single Source of Truth Settings Object
         const devSettings = {
             maxSpeed: 4.5,
             maxBackwardsSpeed: -2.0,
-            trailerLength: 65,
+            trailerLength: 150,
             jointFriction: 0.00,
             carScale: 1.0,
             trailerScale: 1.0,
-            editMode: false
+            editMode: false,
+            jackknifeLock: true,
+            maxHitchAngleDeg: 65
         };
 
         // Solid Level Obstacles
-        const obstacles = [
+        let obstacles = [
             { x: 300, y: 180, width: 220, height: 40 },
             { x: 750, y: 350, width: 40, height: 260 },
             { x: 400, y: 520, width: 180, height: 50 }
@@ -298,11 +320,52 @@
         const trailerScaleSlider = document.getElementById('trailerScaleSlider');
         const trailerScaleVal = document.getElementById('trailerScaleVal');
 
-        // Mode Switching
-        modeToggleBtn.addEventListener('click', toggleEditMode);
+        const saveLocalBtn = document.getElementById('saveLocalBtn');
+        const loadLocalBtn = document.getElementById('loadLocalBtn');
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const importJsonBtn = document.getElementById('importJsonBtn');
+        const importFileInput = document.getElementById('importFileInput');
+        const jackknifeToggleBtn = document.getElementById('jackknifeToggleBtn');
+        const jackknifeVal = document.getElementById('jackknifeVal');
 
-        function toggleEditMode() {
-            devSettings.editMode = !devSettings.editMode;
+        /**
+         * Explicit UI Synchronization Function
+         * Forces all HTML controls and text spans to match devSettings
+         */
+        function syncUI() {
+            // Sliders & Text Values
+            maxSpeedSlider.value = devSettings.maxSpeed;
+            maxSpeedVal.textContent = Number(devSettings.maxSpeed).toFixed(1);
+
+            reverseSlider.value = devSettings.maxBackwardsSpeed;
+            reverseVal.textContent = Number(devSettings.maxBackwardsSpeed).toFixed(1);
+
+            trailerLengthSlider.value = devSettings.trailerLength;
+            trailerLengthVal.textContent = devSettings.trailerLength;
+
+            frictionSlider.value = devSettings.jointFriction;
+            frictionVal.textContent = Number(devSettings.jointFriction).toFixed(2);
+
+            carScaleSlider.value = devSettings.carScale;
+            carScaleVal.textContent = Number(devSettings.carScale).toFixed(1);
+
+            trailerScaleSlider.value = devSettings.trailerScale;
+            trailerScaleVal.textContent = Number(devSettings.trailerScale).toFixed(1);
+
+            // Jackknife Lock Button State
+            if (devSettings.jackknifeLock) {
+                jackknifeToggleBtn.textContent = 'Enabled';
+                jackknifeToggleBtn.style.backgroundColor = '#1b5e20';
+                jackknifeToggleBtn.style.color = '#fff';
+                jackknifeVal.textContent = 'ON';
+            } else {
+                jackknifeToggleBtn.textContent = 'Disabled';
+                jackknifeToggleBtn.style.backgroundColor = '#b71c1c';
+                jackknifeToggleBtn.style.color = '#fff';
+                jackknifeVal.textContent = 'OFF';
+            }
+
+            // Edit Mode Button State
             if (devSettings.editMode) {
                 modeToggleBtn.textContent = 'Edit Mode';
                 modeToggleBtn.className = 'mode-btn edit-mode';
@@ -311,38 +374,114 @@
                 modeToggleBtn.textContent = 'Drive Mode';
                 modeToggleBtn.className = 'mode-btn drive-mode';
                 canvas.style.cursor = 'default';
-                isDrawing = false;
             }
         }
 
-        undoObstacleBtn.addEventListener('click', () => obstacles.pop());
-        clearObstaclesBtn.addEventListener('click', () => obstacles.length = 0);
-
-        // Parameter Adjustments
+        // Two-way Binding: Input Event Listeners Update devSettings & Sync UI
         maxSpeedSlider.addEventListener('input', (e) => {
             devSettings.maxSpeed = parseFloat(e.target.value);
-            maxSpeedVal.textContent = devSettings.maxSpeed.toFixed(1);
+            syncUI();
         });
         reverseSlider.addEventListener('input', (e) => {
             devSettings.maxBackwardsSpeed = parseFloat(e.target.value);
-            reverseVal.textContent = devSettings.maxBackwardsSpeed.toFixed(1);
+            syncUI();
         });
         trailerLengthSlider.addEventListener('input', (e) => {
             devSettings.trailerLength = parseInt(e.target.value);
-            trailerLengthVal.textContent = devSettings.trailerLength;
+            syncUI();
         });
         frictionSlider.addEventListener('input', (e) => {
             devSettings.jointFriction = parseFloat(e.target.value);
-            frictionVal.textContent = devSettings.jointFriction.toFixed(2);
+            syncUI();
         });
         carScaleSlider.addEventListener('input', (e) => {
             devSettings.carScale = parseFloat(e.target.value);
-            carScaleVal.textContent = devSettings.carScale.toFixed(1);
+            syncUI();
         });
         trailerScaleSlider.addEventListener('input', (e) => {
             devSettings.trailerScale = parseFloat(e.target.value);
-            trailerScaleVal.textContent = devSettings.trailerScale.toFixed(1);
+            syncUI();
         });
+
+        jackknifeToggleBtn.addEventListener('click', () => {
+            devSettings.jackknifeLock = !devSettings.jackknifeLock;
+            syncUI();
+        });
+
+        modeToggleBtn.addEventListener('click', () => {
+            devSettings.editMode = !devSettings.editMode;
+            if (!devSettings.editMode) isDrawing = false;
+            syncUI();
+        });
+
+        // Local Storage & File Persistence (Saves BOTH Obstacles and Settings)
+        saveLocalBtn.addEventListener('click', () => {
+            const dataToSave = {
+                obstacles: obstacles,
+                settings: devSettings
+            };
+            localStorage.setItem('trailer_sim_data', JSON.stringify(dataToSave));
+            alert('Level and settings saved to LocalStorage!');
+        });
+
+        loadLocalBtn.addEventListener('click', () => {
+            const saved = localStorage.getItem('trailer_sim_data');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.obstacles) obstacles = parsed.obstacles;
+                    if (parsed.settings) Object.assign(devSettings, parsed.settings);
+                    syncUI();
+                } catch (e) {
+                    alert('Error parsing saved data.');
+                }
+            } else {
+                alert('No saved state found in LocalStorage.');
+            }
+        });
+
+        exportJsonBtn.addEventListener('click', () => {
+            const exportData = {
+                obstacles: obstacles,
+                settings: devSettings
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "vehicle_simulation.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        importJsonBtn.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (Array.isArray(imported)) {
+                        // Legacy support for plain obstacles array
+                        obstacles = imported;
+                    } else if (imported.obstacles || imported.settings) {
+                        if (imported.obstacles) obstacles = imported.obstacles;
+                        if (imported.settings) Object.assign(devSettings, imported.settings);
+                    }
+                    syncUI();
+                } catch (err) {
+                    alert('Invalid JSON file format.');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        undoObstacleBtn.addEventListener('click', () => obstacles.pop());
+        clearObstaclesBtn.addEventListener('click', () => obstacles.length = 0);
 
         // Mouse Handling for Level Editor
         function getCanvasMousePos(e) {
@@ -452,9 +591,8 @@
             }));
         }
 
-        // Collision Engine (Polygon Points + Round Rear Boom Circle)
+        // Collision Engine
         function checkCollisions() {
-            // 1. Vehicle Collision Points
             const carLocalPoints = [
                 { x: 0, y: -car.width / 2 },
                 { x: 0, y: car.width / 2 },
@@ -466,7 +604,6 @@
                 { x: 0, y: 0 }
             ];
 
-            // 2. Trailer Chassis Points
             const trailerLocalPoints = [
                 { x: -15, y: -trailer.width / 2 },
                 { x: -15, y: trailer.width / 2 },
@@ -491,12 +628,10 @@
                 }
             }
 
-            // 3. Round Boom Circle-vs-Rect Collision Check
-            // Diameter is tied to trailer.width (Radius = trailer.width / 2)
+            // Round Boom Circle-vs-Rect Check
             const boomRadiusLocal = trailer.width / 2;
             const boomRadiusWorld = boomRadiusLocal * devSettings.trailerScale;
             
-            // Boom center local offset is -boomRadiusLocal along local X axis (behind wheels)
             const boomCenterXWorld = trailer.x + (-boomRadiusLocal * devSettings.trailerScale) * Math.cos(trailer.heading);
             const boomCenterYWorld = trailer.y + (-boomRadiusLocal * devSettings.trailerScale) * Math.sin(trailer.heading);
 
@@ -549,7 +684,7 @@
             car.y += car.speed * Math.sin(car.heading);
             car.heading += (car.speed * Math.tan(car.steerAngle)) / currentCarLength;
 
-            // 4. Trailer Kinematic Constraint Resolution
+            // 4. Trailer Kinematic Constraint Resolution & Jackknife Lock
             const hitchX = car.x;
             const hitchY = car.y;
 
@@ -559,6 +694,17 @@
             const targetHeading = Math.atan2(dy, dx);
             let angleDiff = targetHeading - trailer.heading;
             angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+
+            // Jackknife Lock Constraint Implementation
+            if (devSettings.jackknifeLock) {
+                const maxRad = (devSettings.maxHitchAngleDeg * Math.PI) / 180;
+                if (Math.abs(angleDiff) > maxRad) {
+                    angleDiff = Math.sign(angleDiff) * maxRad;
+                    if (car.speed < 0) {
+                        car.speed = 0;
+                    }
+                }
+            }
 
             const rigidityFactor = 1 - devSettings.jointFriction;
             trailer.heading += angleDiff * rigidityFactor;
@@ -664,12 +810,10 @@
             ctx.scale(devSettings.trailerScale, devSettings.trailerScale); 
 
             const L = devSettings.trailerLength;
-            // Radius is set proportional to trailer.width (Diameter = trailer.width)
             const R = trailer.width / 2; 
-            const boomCenterX = -R; // Positioned directly behind the wheel axle (0,0)
+            const boomCenterX = -R;
 
-            // 1. REAR BOOM STRUCTURE (Hovering above ground attached to chassis)
-            // Structural mounting struts from axle center to boom
+            // 1. REAR BOOM STRUCTURE
             ctx.strokeStyle = '#ff9100';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -736,8 +880,15 @@
             let relativeAngle = (car.heading - trailer.heading) * (180 / Math.PI);
             relativeAngle = ((relativeAngle + 180) % 360 + 360) % 360 - 180;
             
-            ctx.fillStyle = Math.abs(relativeAngle) > 50 ? '#ff5252' : '#666';
-            ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}°`, 15, 42);
+            const isJackknifed = Math.abs(relativeAngle) >= devSettings.maxHitchAngleDeg;
+            
+            if (isJackknifed && devSettings.jackknifeLock) {
+                ctx.fillStyle = '#ff1744';
+                ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}° [JACKKNIFE LOCK ACTIVE]`, 15, 42);
+            } else {
+                ctx.fillStyle = Math.abs(relativeAngle) > 45 ? '#ff9100' : '#666';
+                ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}°`, 15, 42);
+            }
 
             if (devSettings.editMode) {
                 ctx.fillStyle = '#ff9100';
@@ -757,6 +908,8 @@
             requestAnimationFrame(loop);
         }
 
+        // Initialize UI Synchronization on Load and Start Loop
+        syncUI();
         loop();
     </script>
 </body>
