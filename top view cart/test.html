@@ -238,6 +238,13 @@
             </div>
 
             <div class="control-group">
+                <label for="steerStiffnessSlider">
+                    Steer Stiff: <span id="steerStiffnessVal">1.0</span>x
+                </label>
+                <input type="range" id="steerStiffnessSlider" min="0.5" max="4.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="control-group">
                 <label for="trailerLengthSlider">
                     Trailer Len: <span id="trailerLengthVal">0</span>px
                 </label>
@@ -278,6 +285,7 @@
         const devSettings = {
             maxSpeed: 2.3,
             maxBackwardsSpeed: -1.1,
+            steerStiffness: 1.0,
             trailerLength: 85,
             jointFriction: 0.30,
             carScale: 0.8,
@@ -307,6 +315,8 @@
         const maxSpeedVal = document.getElementById('maxSpeedVal');
         const reverseSlider = document.getElementById('reverseSpeedSlider');
         const reverseVal = document.getElementById('reverseSpeedVal');
+        const steerStiffnessSlider = document.getElementById('steerStiffnessSlider');
+        const steerStiffnessVal = document.getElementById('steerStiffnessVal');
         const trailerLengthSlider = document.getElementById('trailerLengthSlider');
         const trailerLengthVal = document.getElementById('trailerLengthVal');
         const frictionSlider = document.getElementById('jointFrictionSlider');
@@ -333,6 +343,9 @@
 
             reverseSlider.value = devSettings.maxBackwardsSpeed;
             reverseVal.textContent = Number(devSettings.maxBackwardsSpeed).toFixed(1);
+
+            steerStiffnessSlider.value = devSettings.steerStiffness;
+            steerStiffnessVal.textContent = Number(devSettings.steerStiffness).toFixed(1);
 
             trailerLengthSlider.value = devSettings.trailerLength;
             trailerLengthVal.textContent = devSettings.trailerLength;
@@ -378,6 +391,10 @@
         });
         reverseSlider.addEventListener('input', (e) => {
             devSettings.maxBackwardsSpeed = parseFloat(e.target.value);
+            syncUI();
+        });
+        steerStiffnessSlider.addEventListener('input', (e) => {
+            devSettings.steerStiffness = parseFloat(e.target.value);
             syncUI();
         });
         trailerLengthSlider.addEventListener('input', (e) => {
@@ -634,14 +651,18 @@
             if (car.speed > devSettings.maxSpeed) car.speed = devSettings.maxSpeed;
             if (car.speed < devSettings.maxBackwardsSpeed) car.speed = devSettings.maxBackwardsSpeed;
 
-            // 2. Steering Controls
+            // 2. Steering Controls with Dynamic Stiffness Scaling
+            const stiffnessFactor = 1 / devSettings.steerStiffness;
+            const effectiveSteerSpeed = car.steerSpeed * stiffnessFactor;
+            const effectiveReturnSpeed = car.steerReturnSpeed * stiffnessFactor;
+
             if (keys.ArrowLeft) {
-                car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - car.steerSpeed);
+                car.steerAngle = Math.max(-car.maxSteerAngle, car.steerAngle - effectiveSteerSpeed);
             } else if (keys.ArrowRight) {
-                car.steerAngle = Math.min(car.maxSteerAngle, car.steerAngle + car.steerSpeed);
+                car.steerAngle = Math.min(car.maxSteerAngle, car.steerAngle + effectiveSteerSpeed);
             } else {
-                if (car.steerAngle > 0) car.steerAngle = Math.max(0, car.steerAngle - car.steerReturnSpeed);
-                else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + car.steerReturnSpeed);
+                if (car.steerAngle > 0) car.steerAngle = Math.max(0, car.steerAngle - effectiveReturnSpeed);
+                else if (car.steerAngle < 0) car.steerAngle = Math.min(0, car.steerAngle + effectiveReturnSpeed);
             }
 
             // 3. Movement Physics Integration
