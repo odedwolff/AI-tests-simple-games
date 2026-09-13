@@ -181,7 +181,7 @@
     <div class="header-strip">
         <h1>Vehicle & Trailer Sandbox</h1>
         <div class="instructions">
-            Drive: <b>Up/Down Arrows</b> | Steer: <b>Left/Right Arrows</b>
+            Drive: <b>Up/Down Arrows</b> | Steer: <b>Left/Right Arrows</b> | Paint: <b>Spacebar</b>
         </div>
     </div>
 
@@ -212,6 +212,19 @@
                 <button id="loadStageBtn" class="sub-btn">LOAD STAGE</button>
             </div>
             <input type="file" id="stageFileInput" accept=".json" style="display: none;">
+
+            <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
+            <h2>Ground Paint</h2>
+
+            <div class="control-group">
+                <label>
+                    Paint Mode: <span id="paintModeVal">OFF</span>
+                </label>
+                <button id="paintToggleBtn" class="sub-btn">Disabled</button>
+            </div>
+            <div class="btn-group">
+                <button id="clearPaintBtn" class="sub-btn">Clear Tracks</button>
+            </div>
 
             <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
             <h2>Safety & Physics</h2>
@@ -281,18 +294,25 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Off-screen canvas layer for persistent paint tracks
+        const paintCanvas = document.createElement('canvas');
+        paintCanvas.width = canvas.width;
+        paintCanvas.height = canvas.height;
+        const paintCtx = paintCanvas.getContext('2d');
+
         // Central Single Source of Truth Settings Object
         const devSettings = {
             maxSpeed: 2.3,
             maxBackwardsSpeed: -1.1,
-            steerStiffness: 1.0,
+            steerStiffness: 2.0,
             trailerLength: 85,
             jointFriction: 0.30,
             carScale: 0.8,
             trailerScale: 0.7,
             editMode: false,
             jackknifeLock: true,
-            maxHitchAngleDeg: 65
+            maxHitchAngleDeg: 65,
+            isPainting: false
         };
 
         // Solid Level Obstacles (Internal Walls Stage Configuration)
@@ -332,6 +352,10 @@
         const jackknifeToggleBtn = document.getElementById('jackknifeToggleBtn');
         const jackknifeVal = document.getElementById('jackknifeVal');
 
+        const paintToggleBtn = document.getElementById('paintToggleBtn');
+        const paintModeVal = document.getElementById('paintModeVal');
+        const clearPaintBtn = document.getElementById('clearPaintBtn');
+
         /**
          * Explicit UI Synchronization Function
          * Forces all HTML controls and text spans to match devSettings
@@ -370,6 +394,19 @@
                 jackknifeToggleBtn.style.backgroundColor = '#b71c1c';
                 jackknifeToggleBtn.style.color = '#fff';
                 jackknifeVal.textContent = 'OFF';
+            }
+
+            // Paint Toggle Button State
+            if (devSettings.isPainting) {
+                paintToggleBtn.textContent = 'ON (Space)';
+                paintToggleBtn.style.backgroundColor = '#ff9100';
+                paintToggleBtn.style.color = '#000';
+                paintModeVal.textContent = 'ON';
+            } else {
+                paintToggleBtn.textContent = 'OFF (Space)';
+                paintToggleBtn.style.backgroundColor = '#2a2a2a';
+                paintToggleBtn.style.color = '#ccc';
+                paintModeVal.textContent = 'OFF';
             }
 
             // Edit Mode Button State
@@ -417,6 +454,15 @@
         jackknifeToggleBtn.addEventListener('click', () => {
             devSettings.jackknifeLock = !devSettings.jackknifeLock;
             syncUI();
+        });
+
+        paintToggleBtn.addEventListener('click', () => {
+            devSettings.isPainting = !devSettings.isPainting;
+            syncUI();
+        });
+
+        clearPaintBtn.addEventListener('click', () => {
+            paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
         });
 
         modeToggleBtn.addEventListener('click', () => {
@@ -521,7 +567,16 @@
 
         // Keyboard Inputs
         const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        window.addEventListener('keydown', (e) => { if (e.key in keys) { keys[e.key] = true; e.preventDefault(); } });
+        window.addEventListener('keydown', (e) => { 
+            if (e.key in keys) { 
+                keys[e.key] = true; 
+                e.preventDefault(); 
+            } else if (e.code === 'Space') {
+                e.preventDefault();
+                devSettings.isPainting = !devSettings.isPainting;
+                syncUI();
+            }
+        });
         window.addEventListener('keyup', (e) => { if (e.key in keys) { keys[e.key] = false; e.preventDefault(); } });
 
         // Base Kinematic Profiles
@@ -562,6 +617,25 @@
             for (let y = 0; y < canvas.height; y += gridSize) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
+        }
+
+        function drawPaintLayer() {
+            ctx.drawImage(paintCanvas, 0, 0);
+        }
+
+        function applyBoomPaint() {
+            if (!devSettings.isPainting) return;
+
+            const boomRadiusLocal = trailer.width / 2;
+            const boomRadiusWorld = boomRadiusLocal * devSettings.trailerScale;
+            
+            const boomCenterXWorld = trailer.x + (-boomRadiusLocal * devSettings.trailerScale) * Math.cos(trailer.heading);
+            const boomCenterYWorld = trailer.y + (-boomRadiusLocal * devSettings.trailerScale) * Math.sin(trailer.heading);
+
+            paintCtx.fillStyle = 'rgba(255, 145, 0, 0.45)';
+            paintCtx.beginPath();
+            paintCtx.arc(boomCenterXWorld, boomCenterYWorld, boomRadiusWorld, 0, Math.PI * 2);
+            paintCtx.fill();
         }
 
         function getTransformedPoints(originX, originY, heading, scale, localPoints) {
@@ -715,6 +789,9 @@
                 trailer.heading = prevTrailer.heading;
                 car.speed = 0;
             }
+
+            // 7. Ground Paint Stamp Step
+            applyBoomPaint();
         }
 
         function drawObstacles() {
@@ -810,12 +887,12 @@
             ctx.stroke();
 
             // Outer Round Boom Ring
-            ctx.fillStyle = 'rgba(255, 145, 0, 0.15)';
+            ctx.fillStyle = devSettings.isPainting ? 'rgba(255, 145, 0, 0.5)' : 'rgba(255, 145, 0, 0.15)';
             ctx.beginPath();
             ctx.arc(boomCenterX, 0, R, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.strokeStyle = '#ff9100';
+            ctx.strokeStyle = devSettings.isPainting ? '#ffffff' : '#ff9100';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.arc(boomCenterX, 0, R, 0, Math.PI * 2);
@@ -876,6 +953,12 @@
                 ctx.fillText(`Hitch Deg : ${relativeAngle.toFixed(1)}°`, 15, 42);
             }
 
+            if (devSettings.isPainting) {
+                ctx.fillStyle = '#ff9100';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(`[PAINT ACTIVE - SPACE TO TOGGLE]`, 15, 59);
+            }
+
             if (devSettings.editMode) {
                 ctx.fillStyle = '#ff9100';
                 ctx.font = 'bold 13px sans-serif';
@@ -886,6 +969,7 @@
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawGrid();
+            drawPaintLayer();
             updatePhysics();
             drawObstacles();
             drawTrailer();

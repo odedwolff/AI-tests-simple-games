@@ -11,6 +11,6 @@ TODO:
 
 - FIX: when scaling the trailer's size, its pivot changes 
 - boom should be positioned slightly further back 
-- boom color should be solid 
+- maybe replace continues "lawn mowing" have some object to be collected with the rear boom
 
 
