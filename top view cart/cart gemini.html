@@ -205,17 +205,13 @@
             </div>
 
             <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
-            <h2>Level Storage</h2>
+            <h2>Stage Development</h2>
 
             <div class="btn-group">
-                <button id="saveLocalBtn" class="sub-btn">Save Local</button>
-                <button id="loadLocalBtn" class="sub-btn">Load Local</button>
+                <button id="saveStageBtn" class="sub-btn">SAVE STAGE</button>
+                <button id="loadStageBtn" class="sub-btn">LOAD STAGE</button>
             </div>
-            <div class="btn-group">
-                <button id="exportJsonBtn" class="sub-btn">Export JSON</button>
-                <button id="importJsonBtn" class="sub-btn">Import JSON</button>
-            </div>
-            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            <input type="file" id="stageFileInput" accept=".json" style="display: none;">
 
             <hr style="border: 0; border-top: 1px solid #222; margin: 2px 0;">
             <h2>Safety & Physics</h2>
@@ -291,7 +287,7 @@
             maxHitchAngleDeg: 65
         };
 
-        // Solid Level Obstacles
+        // Solid Level Obstacles (Internal Walls Stage Configuration)
         let obstacles = [
             { x: 300, y: 180, width: 220, height: 40 },
             { x: 750, y: 350, width: 40, height: 260 },
@@ -320,11 +316,9 @@
         const trailerScaleSlider = document.getElementById('trailerScaleSlider');
         const trailerScaleVal = document.getElementById('trailerScaleVal');
 
-        const saveLocalBtn = document.getElementById('saveLocalBtn');
-        const loadLocalBtn = document.getElementById('loadLocalBtn');
-        const exportJsonBtn = document.getElementById('exportJsonBtn');
-        const importJsonBtn = document.getElementById('importJsonBtn');
-        const importFileInput = document.getElementById('importFileInput');
+        const saveStageBtn = document.getElementById('saveStageBtn');
+        const loadStageBtn = document.getElementById('loadStageBtn');
+        const stageFileInput = document.getElementById('stageFileInput');
         const jackknifeToggleBtn = document.getElementById('jackknifeToggleBtn');
         const jackknifeVal = document.getElementById('jackknifeVal');
 
@@ -414,67 +408,38 @@
             syncUI();
         });
 
-        // Local Storage & File Persistence (Saves BOTH Obstacles and Settings)
-        saveLocalBtn.addEventListener('click', () => {
-            const dataToSave = {
-                obstacles: obstacles,
-                settings: devSettings
-            };
-            localStorage.setItem('trailer_sim_data', JSON.stringify(dataToSave));
-            alert('Level and settings saved to LocalStorage!');
-        });
-
-        loadLocalBtn.addEventListener('click', () => {
-            const saved = localStorage.getItem('trailer_sim_data');
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    if (parsed.obstacles) obstacles = parsed.obstacles;
-                    if (parsed.settings) Object.assign(devSettings, parsed.settings);
-                    syncUI();
-                } catch (e) {
-                    alert('Error parsing saved data.');
-                }
-            } else {
-                alert('No saved state found in LocalStorage.');
-            }
-        });
-
-        exportJsonBtn.addEventListener('click', () => {
-            const exportData = {
-                obstacles: obstacles,
-                settings: devSettings
-            };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+        // Stage File Save and Load (Dev mode wall configurations)
+        saveStageBtn.addEventListener('click', () => {
+            const stageDataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(obstacles, null, 2));
             const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "vehicle_simulation.json");
+            downloadAnchor.setAttribute("href", stageDataStr);
+            downloadAnchor.setAttribute("download", "stage_config.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
         });
 
-        importJsonBtn.addEventListener('click', () => {
-            importFileInput.click();
+        loadStageBtn.addEventListener('click', () => {
+            stageFileInput.click();
         });
 
-        importFileInput.addEventListener('change', (e) => {
+        stageFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 try {
-                    const imported = JSON.parse(event.target.result);
-                    if (Array.isArray(imported)) {
-                        // Legacy support for plain obstacles array
-                        obstacles = imported;
-                    } else if (imported.obstacles || imported.settings) {
-                        if (imported.obstacles) obstacles = imported.obstacles;
-                        if (imported.settings) Object.assign(devSettings, imported.settings);
+                    const loadedData = JSON.parse(event.target.result);
+                    if (Array.isArray(loadedData)) {
+                        obstacles = loadedData;
+                    } else if (loadedData.obstacles && Array.isArray(loadedData.obstacles)) {
+                        obstacles = loadedData.obstacles;
+                    } else {
+                        throw new Error('Invalid format');
                     }
                     syncUI();
                 } catch (err) {
-                    alert('Invalid JSON file format.');
+                    alert('Invalid stage configuration JSON file.');
                 }
             };
             reader.readAsText(file);

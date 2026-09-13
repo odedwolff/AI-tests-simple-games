@@ -6,6 +6,11 @@ Gemini conversation (for as long as it lasts): https://gemini.google.com/app/aa8
 
 
 TODO:
+
+- add a setting for steering wheel responsiveness / speed of response, maybe add a steering wheel graphic 
+
 - FIX: when scaling the trailer's size, its pivot changes 
 - boom should be positioned slightly further back 
 - boom color should be solid 
+
+
