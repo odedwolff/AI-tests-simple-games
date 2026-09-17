@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vehicle & Trailer Sandbox</title>
 <style>
 *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;background:#111;color:#eee;overflow:hidden}.app{height:100%;display:flex;flex-direction:column}.top{height:48px;background:#1b1b1b;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 14px;gap:20px}.title{font-weight:700}.help{font-size:12px;color:#aaa}.body{flex:1;display:flex;min-height:0}.canvasWrap{position:relative;flex:1;background:#d8d8d8}.canvas{display:block;width:100%;height:100%;cursor:crosshair}.panel{width:285px;background:#202020;border-left:1px solid #333;padding:12px;overflow:auto}.section{border-top:1px solid #3b3b3b;padding-top:10px;margin-top:10px}.section h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;margin:0 0 9px}.row{display:flex;align-items:center;gap:8px;margin:7px 0}.row button{flex:1}.btn{border:1px solid #555;background:#303030;color:#eee;border-radius:5px;padding:7px 8px;cursor:pointer}.btn:hover{background:#3a3a3a}.btn.active{background:#555}.slider{width:100%}.val{width:42px;text-align:right;font-size:12px;color:#bbb}.label{font-size:13px;flex:1}.hint{font-size:11px;color:#999;line-height:1.35}.status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}.file{display:none}
-</style></head><body><div class="app"><header class="top"><div class="title">2D Vehicle & Trailer Sandbox</div><div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode</div></header><div class="body"><div class="canvasWrap"><canvas id="c" class="canvas"></canvas><div id="status" class="status">DRIVE</div></div><aside class="panel">
+</style></head><body><div class="app"><header class="top"><div class="title">2D Vehicle & Trailer Sandbox</div><div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode R reset position</div></header><div class="body"><div class="canvasWrap"><canvas id="c" class="canvas"></canvas><div id="status" class="status">DRIVE</div></div><aside class="panel">
 <div class="section" style="border-top:0;margin-top:0;padding-top:0"><h3>Level Editor</h3><div class="row"><button id="mode" class="btn">Switch to Edit Mode</button></div><div class="row"><button id="undo" class="btn">Undo Last Obstacle</button><button id="clear" class="btn">Clear All</button></div></div>
 <div class="section"><h3>Stage Development</h3><div class="row"><button id="save" class="btn">Save Stage</button><button id="loadBtn" class="btn">Load Stage</button><input id="load" class="file" type="file" accept=".json,application/json"></div></div>
 <div class="section"><h3>Ground Paint</h3><div class="row"><button id="paint" class="btn">Paint: OFF</button><button id="clearTracks" class="btn">Clear Tracks</button></div></div>
@@ -11,12 +11,13 @@
 <label class="row"><span class="label">Reverse Speed</span><input id="rev" class="slider" type="range" min="20" max="180" value="80"><span id="revv" class="val">80</span></label>
 <label class="row"><span class="label">Steering Stiffness</span><input id="steer" class="slider" type="range" min="0.5" max="8" step="0.1" value="3"><span id="steerv" class="val">3.0</span></label>
 <label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
+<label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
 <label class="row"><span class="label">Joint Friction</span><input id="fric" class="slider" type="range" min="0" max="10" step="0.1" value="1.5"><span id="fricv" class="val">1.5</span></label>
 </div><div class="section"><h3>Dimension Scales</h3>
 <label class="row"><span class="label">Vehicle Scale</span><input id="vs" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="vsv" class="val">1.00</span></label>
 <label class="row"><span class="label">Trailer Scale</span><input id="ts" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="tsv" class="val">1.00</span></label>
-</div><div class="section hint">Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor. Stage files contain obstacles and current settings.</div>
+</div><div class="section hint">Drive mode: press R to reset the vehicle and trailer to their initial position. Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor. Stage files contain obstacles and current settings.</div>
 </aside></div></div>
 <script>const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -48,6 +49,7 @@ const settings = {
     rev: 80,
     steer: 3,
     maxSteer: 35,
+    paintDiameter: 95,
     len: 95,
     fric: 1.5,
     vs: 1,
@@ -78,6 +80,25 @@ const car = {
     ta: 0
 };
 
+// The position and orientation used by the R reset shortcut.
+const initialVehicleState = {
+    x: W * 0.42,
+    y: H * 0.55,
+    a: 0,
+    ta: 0
+};
+
+function resetVehicle() {
+    car.x = initialVehicleState.x;
+    car.y = initialVehicleState.y;
+    car.a = initialVehicleState.a;
+    car.ta = initialVehicleState.ta;
+    car.v = 0;
+    car.steer = 0;
+    car.omega = 0;
+    lastPaintPosition = null;
+}
+
 // -----------------------------------------------------------------------------
 // Developer controls
 // -----------------------------------------------------------------------------
@@ -87,6 +108,7 @@ const settingFormats = {
     rev: value => value,
     steer: value => value.toFixed(1),
     maxSteer: value => `${value}°`,
+    paintDiameter: value => value,
     len: value => value,
     fric: value => value.toFixed(1),
     vs: value => value.toFixed(2),
@@ -142,6 +164,10 @@ window.addEventListener('keydown', event => {
 
     if (event.key.toLowerCase() === 'm') {
         toggleMode();
+    }
+
+    if (event.key.toLowerCase() === 'r' && !event.repeat) {
+        resetVehicle();
     }
 });
 
@@ -628,7 +654,7 @@ function drawTracks() {
 
     // Each mark is a solid, bright-gray circle. Its diameter is approximately
     // the trailer length and the marks are laid down on the ground permanently.
-    const radius = (S.len * S.ts) / 2;
+    const radius = S.paintDiameter / 2;
 
     ctx.fillStyle = '#b8b8b8';
 
