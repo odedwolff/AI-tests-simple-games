@@ -44,7 +44,7 @@ resize();
 // Hard-coded initial values for all developer settings.
 // Change these values to change the defaults used when the page starts.
 const settings = {
-    fwd: 190,
+    fwd: 170,
     rev: 80,
     steer: 3,
     maxSteer: 35,
@@ -63,6 +63,7 @@ let paint = false;
 let keys = {};
 let obstacles = [];
 let tracks = [];
+let lastPaintPosition = null;
 let drag = null;
 let lastMouse = { x: 0, y: 0 };
 
@@ -133,6 +134,12 @@ window.addEventListener('keydown', event => {
         event.preventDefault();
     }
 
+    // Space toggles continuous ground painting. Key repeat is ignored so
+    // holding Space does not repeatedly toggle the state.
+    if (event.key === ' ' && !event.repeat) {
+        setPaintEnabled(!paint);
+    }
+
     if (event.key.toLowerCase() === 'm') {
         toggleMode();
     }
@@ -153,13 +160,19 @@ function toggleMode() {
 
 document.getElementById('mode').onclick = toggleMode;
 
-document.getElementById('paint').onclick = () => {
-    paint = !paint;
+function setPaintEnabled(enabled) {
+    paint = enabled;
+    lastPaintPosition = null;
     document.getElementById('paint').textContent = `Paint: ${paint ? 'ON' : 'OFF'}`;
+}
+
+document.getElementById('paint').onclick = () => {
+    setPaintEnabled(!paint);
 };
 
 document.getElementById('clearTracks').onclick = () => {
     tracks = [];
+    lastPaintPosition = null;
 };
 
 document.getElementById('clear').onclick = () => {
@@ -547,18 +560,38 @@ function update(dt) {
         car.ta = oldState.ta;
     }
 
-    // Paint is emitted from the trailer's rear/axle area. Each stored point
-    // represents the center of a stamp; rendering joins the stamps into a
-    // continuous strip approximately as wide as the trailer.
-    if ((paint || keys[' ']) && Math.abs(car.v) > 2) {
-        tracks.push({
+    // Paint is independent of the physics. When enabled, continuously stamp
+    // solid circles onto the ground at the trailer's rear axle. The circle
+    // diameter is approximately the trailer length, so the painted route
+    // closely follows the path taken by the vehicle/trailer.
+    if (paint) {
+        const paintPosition = {
             x: trailerState.ax,
             y: trailerState.ay
-        });
+        };
 
-        if (tracks.length > 2500) {
-            tracks.splice(0, 500);
+        if (lastPaintPosition) {
+            const dx = paintPosition.x - lastPaintPosition.x;
+            const dy = paintPosition.y - lastPaintPosition.y;
+            const distance = Math.hypot(dx, dy);
+            const spacing = Math.max(2, 12 * S.ts);
+            const steps = Math.max(1, Math.ceil(distance / spacing));
+
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                tracks.push({
+                    x: lastPaintPosition.x + dx * t,
+                    y: lastPaintPosition.y + dy * t
+                });
+            }
+        } else {
+            tracks.push(paintPosition);
         }
+
+        lastPaintPosition = paintPosition;
+
+    } else {
+        lastPaintPosition = null;
     }
 }
 
@@ -589,24 +622,21 @@ function drawGrid() {
 }
 
 function drawTracks() {
-    if (tracks.length < 2) {
+    if (!tracks.length) {
         return;
     }
 
-    // The strip is deliberately about the same width as the trailer.
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 56 * S.ts;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Each mark is a solid, bright-gray circle. Its diameter is approximately
+    // the trailer length and the marks are laid down on the ground permanently.
+    const radius = (S.len * S.ts) / 2;
 
-    ctx.beginPath();
-    ctx.moveTo(tracks[0].x, tracks[0].y);
+    ctx.fillStyle = '#b8b8b8';
 
-    for (let i = 1; i < tracks.length; i++) {
-        ctx.lineTo(tracks[i].x, tracks[i].y);
+    for (const track of tracks) {
+        ctx.beginPath();
+        ctx.arc(track.x, track.y, radius, 0, Math.PI * 2);
+        ctx.fill();
     }
-
-    ctx.stroke();
 }
 
 function drawObstacles() {
