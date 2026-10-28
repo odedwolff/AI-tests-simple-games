@@ -1,6 +1,5 @@
 
 
+BUGS AND ISSUES 
 
-TODO: 
--eliminate drifting 
--draw trailer bar 
+the collider detector of the trailer seems to be non consistent with its shape. it encountered it in scaled down status, not sure its related to that fact though. 

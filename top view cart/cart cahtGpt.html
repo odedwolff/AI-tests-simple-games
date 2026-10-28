@@ -531,7 +531,9 @@ function update(dt) {
     const steeringAngle =
         car.steer * S.maxSteer * Math.PI / 180;
     const vehicleWheelbase = 90 * S.vs;
-    const turnRate = Math.tan(steeringAngle) * car.v / vehicleWheelbase;
+    // Keep left/right steering intuitive in both forward and reverse:
+    // reversing changes travel direction, but not the requested turn direction.
+    const turnRate = Math.tan(steeringAngle) * Math.abs(car.v) / vehicleWheelbase;
     car.omega = turnRate;
 
     // Save the complete state so a collision can reject the movement.
@@ -573,17 +575,65 @@ function update(dt) {
         car.v = 0;
     }
 
-    const trailerState = trailer();
+    let trailerState = trailer();
 
-    // Both the towing vehicle AND the trailer are solid against obstacles.
+    // Resolve collisions by trying each movement axis separately. This lets
+    // the vehicle slide along the face of a block instead of repeatedly
+    // colliding at the same point and becoming stuck.
     if (vehicleAndTrailerHitObstacle(trailerState)) {
+        const attemptedState = {
+            x: car.x, y: car.y, a: car.a, ta: car.ta
+        };
+
+        // Restore the previous pose before testing alternative movements.
         car.x = oldState.x;
         car.y = oldState.y;
         car.a = oldState.a;
-        car.v = 0;
-        car.steer = oldState.steer;
-        car.omega = oldState.omega;
         car.ta = oldState.ta;
+
+        // Try sliding horizontally while keeping the attempted heading.
+        car.x = attemptedState.x;
+        car.y = oldState.y;
+        car.a = attemptedState.a;
+        car.ta = oldState.ta;
+        trailerState = trailer();
+        const horizontalClear = !vehicleAndTrailerHitObstacle(trailerState);
+
+        // Reset the trailer angle before trying the other axis.
+        car.ta = oldState.ta;
+        car.x = oldState.x;
+        car.y = attemptedState.y;
+        car.a = attemptedState.a;
+        trailerState = trailer();
+        const verticalClear = !vehicleAndTrailerHitObstacle(trailerState);
+
+        if (horizontalClear && (!verticalClear ||
+            Math.abs(attemptedState.x - oldState.x) >=
+            Math.abs(attemptedState.y - oldState.y))) {
+            car.x = attemptedState.x;
+            car.y = oldState.y;
+            car.a = attemptedState.a;
+            car.ta = oldState.ta;
+            car.v = 0;
+        } else if (verticalClear) {
+            car.x = oldState.x;
+            car.y = attemptedState.y;
+            car.a = attemptedState.a;
+            car.ta = oldState.ta;
+            car.v = 0;
+        } else {
+            // Neither slide is possible; stop at the last non-colliding pose.
+            car.x = oldState.x;
+            car.y = oldState.y;
+            car.a = oldState.a;
+            car.v = 0;
+            car.steer = oldState.steer;
+            car.omega = oldState.omega;
+            car.ta = oldState.ta;
+        }
+
+        // Recompute the final trailer pose for painting and rendering.
+        trailerState = trailer();
     }
 
     // Paint is independent of the physics. When enabled, continuously stamp
