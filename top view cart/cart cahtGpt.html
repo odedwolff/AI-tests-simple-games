@@ -1,12 +1,77 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vehicle & Trailer Sandbox</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vehicle & Trailer Sandbox</title>
 <style>
-*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;background:#111;color:#eee;overflow:hidden}.app{height:100%;display:flex;flex-direction:column}.top{height:48px;background:#1b1b1b;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 14px;gap:20px}.title{font-weight:700}.help{font-size:12px;color:#aaa}.body{flex:1;display:flex;min-height:0}.canvasWrap{position:relative;flex:1;background:#d8d8d8}.canvas{display:block;width:100%;height:100%;cursor:crosshair}.panel{width:285px;background:#202020;border-left:1px solid #333;padding:12px;overflow:auto}.section{border-top:1px solid #3b3b3b;padding-top:10px;margin-top:10px}.section h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;margin:0 0 9px}.row{display:flex;align-items:center;gap:8px;margin:7px 0}.row button{flex:1}.btn{border:1px solid #555;background:#303030;color:#eee;border-radius:5px;padding:7px 8px;cursor:pointer}.btn:hover{background:#3a3a3a}.btn.active{background:#555}.slider{width:100%}.val{width:42px;text-align:right;font-size:12px;color:#bbb}.label{font-size:13px;flex:1}.hint{font-size:11px;color:#999;line-height:1.35}.status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}.file{display:none}
-</style></head><body><div class="app"><header class="top"><div class="title">2D Vehicle & Trailer Sandbox</div><div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode · R reset position</div></header><div class="body"><div class="canvasWrap"><canvas id="c" class="canvas"></canvas><div id="status" class="status">DRIVE</div></div><aside class="panel">
-<div class="section" style="border-top:0;margin-top:0;padding-top:0"><h3>Level Editor</h3><div class="row"><button id="mode" class="btn">Switch to Edit Mode</button></div><div class="row"><button id="undo" class="btn">Undo Last Obstacle</button><button id="clear" class="btn">Clear All</button></div></div>
-<div class="section"><h3>Stage Development</h3><div class="row"><button id="save" class="btn">Save Stage</button><button id="loadBtn" class="btn">Load Stage</button><input id="load" class="file" type="file" accept=".json,application/json"></div></div>
-<div class="section"><h3>Ground Paint</h3><div class="row"><button id="paint" class="btn">Paint: OFF</button><button id="clearTracks" class="btn">Clear Tracks</button></div></div>
-<div class="section"><h3>Developer Settings</h3>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;background:#111;color:#eee;overflow:hidden}
+.app{height:100%;display:flex;flex-direction:column}
+.top{height:48px;background:#1b1b1b;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 14px;gap:20px}
+.title{font-weight:700}
+.help{font-size:12px;color:#aaa}
+.body{flex:1;display:flex;min-height:0}
+.canvasWrap{position:relative;flex:1;background:#d8d8d8}
+.canvas{display:block;width:100%;height:100%;cursor:crosshair}
+.panel{width:285px;background:#202020;border-left:1px solid #333;padding:12px;overflow:auto}
+.section{border-top:1px solid #3b3b3b;padding-top:10px;margin-top:10px}
+.section h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;margin:0 0 9px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row button{flex:1}
+.btn{border:1px solid #555;background:#303030;color:#eee;border-radius:5px;padding:7px 8px;cursor:pointer}
+.btn:hover{background:#3a3a3a}
+.btn.active{background:#555}
+.slider{width:100%}
+.val{width:42px;text-align:right;font-size:12px;color:#bbb}
+.label{font-size:13px;flex:1}
+.hint{font-size:11px;color:#999;line-height:1.35}
+.status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}
+.file{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+<div class="title">2D Vehicle & Trailer Sandbox</div>
+<div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode · R reset position</div>
+</header>
+
+<div class="body">
+<div class="canvasWrap">
+<canvas id="c" class="canvas"></canvas>
+<div id="status" class="status">DRIVE</div>
+</div>
+
+<aside class="panel">
+<div class="section" style="border-top:0;margin-top:0;padding-top:0">
+<h3>Level Editor</h3>
+<div class="row"><button id="mode" class="btn">Switch to Edit Mode</button></div>
+<div class="row">
+<button id="undo" class="btn">Undo Last Obstacle</button>
+<button id="clear" class="btn">Clear All</button>
+</div>
+</div>
+
+<div class="section">
+<h3>Stage Development</h3>
+<div class="row">
+<button id="save" class="btn">Save Stage</button>
+<button id="loadBtn" class="btn">Load Stage</button>
+<input id="load" class="file" type="file" accept=".json,application/json">
+</div>
+</div>
+
+<div class="section">
+<h3>Ground Paint</h3>
+<div class="row">
+<button id="paint" class="btn">Paint: OFF</button>
+<button id="clearTracks" class="btn">Clear Tracks</button>
+</div>
+</div>
+
+<div class="section">
+<h3>Developer Settings</h3>
 <label class="row"><span class="label">Forward Speed</span><input id="fwd" class="slider" type="range" min="40" max="400" value="170"><span id="fwdv" class="val">170</span></label>
 <label class="row"><span class="label">Reverse Speed</span><input id="rev" class="slider" type="range" min="20" max="180" value="80"><span id="revv" class="val">80</span></label>
 <label class="row"><span class="label">Steering Stiffness</span><input id="steer" class="slider" type="range" min="0.5" max="8" step="0.1" value="3"><span id="steerv" class="val">3.0</span></label>
@@ -14,25 +79,50 @@
 <label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
 <label class="row"><span class="label">Joint Friction</span><input id="fric" class="slider" type="range" min="0" max="10" step="0.1" value="1.5"><span id="fricv" class="val">1.5</span></label>
-</div><div class="section"><h3>Dimension Scales</h3>
+</div>
+
+<div class="section">
+<h3>Dimension Scales</h3>
 <label class="row"><span class="label">Vehicle Scale</span><input id="vs" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="vsv" class="val">1.00</span></label>
 <label class="row"><span class="label">Trailer Scale</span><input id="ts" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="tsv" class="val">1.00</span></label>
-</div><div class="section hint">Drive mode: press R to reset the vehicle and trailer to their initial position. Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor. Stage files contain obstacles and current settings.</div>
-</aside></div></div>
-<script>const canvas = document.getElementById('c');
+</div>
+
+<div class="section hint">
+Drive mode: press R to reset the vehicle and trailer to their initial position.
+Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor.
+Stage files contain obstacles and current settings.
+</div>
+</aside>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
 let W = 0;
 let H = 0;
 let dpr = 1;
 
+// Fixed-size ground grid and cached off-screen canvas.
+// These declarations must occur before the first resize() call.
+const GROUND_CELL_SIZE = 5;
+let groundCanvas = document.createElement('canvas');
+let groundCtx = groundCanvas.getContext('2d');
+let groundColumns = 0;
+let groundRows = 0;
+let groundCells = new Uint8Array(0);
+
 function resize() {
     dpr = window.devicePixelRatio || 1;
     W = canvas.clientWidth;
     H = canvas.clientHeight;
+
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    initializeGround();
 }
 
 window.addEventListener('resize', resize);
@@ -42,8 +132,6 @@ resize();
 // Simulation settings and state
 // -----------------------------------------------------------------------------
 
-// Hard-coded initial values for all developer settings.
-// Change these values to change the defaults used when the page starts.
 const settings = {
     fwd: 96,
     rev: 80,
@@ -56,15 +144,12 @@ const settings = {
     ts: 1
 };
 
-// Runtime settings. The UI is synchronized from this object at initialization
-// and again whenever a stage is loaded.
 const S = { ...settings };
 
 let edit = false;
 let paint = false;
 let keys = {};
 let obstacles = [];
-let tracks = [];
 let lastPaintPosition = null;
 let drag = null;
 let lastMouse = { x: 0, y: 0 };
@@ -80,7 +165,6 @@ const car = {
     ta: 0
 };
 
-// The position and orientation used by the R reset shortcut.
 const initialVehicleState = {
     x: W * 0.42,
     y: H * 0.55,
@@ -120,9 +204,7 @@ function syncSettingsToUI() {
         const element = document.getElementById(key);
         const valueElement = document.getElementById(`${key}v`);
 
-        if (!element || !valueElement) {
-            continue;
-        }
+        if (!element || !valueElement) continue;
 
         element.value = S[key];
         valueElement.textContent = settingFormats[key](Number(S[key]));
@@ -142,7 +224,6 @@ for (const key of Object.keys(settings)) {
     bind(key, key);
 }
 
-// Make the HTML controls reflect the hard-coded defaults immediately.
 syncSettingsToUI();
 
 // -----------------------------------------------------------------------------
@@ -156,8 +237,6 @@ window.addEventListener('keydown', event => {
         event.preventDefault();
     }
 
-    // Space toggles continuous ground painting. Key repeat is ignored so
-    // holding Space does not repeatedly toggle the state.
     if (event.key === ' ' && !event.repeat) {
         setPaintEnabled(!paint);
     }
@@ -177,10 +256,10 @@ window.addEventListener('keyup', event => {
 
 function toggleMode() {
     edit = !edit;
-    document.getElementById('mode').textContent = edit
-        ? 'Switch to Drive Mode'
-        : 'Switch to Edit Mode';
-    document.getElementById('status').textContent = edit ? 'EDIT MODE' : 'DRIVE';
+    document.getElementById('mode').textContent =
+        edit ? 'Switch to Drive Mode' : 'Switch to Edit Mode';
+    document.getElementById('status').textContent =
+        edit ? 'EDIT MODE' : 'DRIVE';
     canvas.style.cursor = edit ? 'crosshair' : 'default';
 }
 
@@ -189,7 +268,8 @@ document.getElementById('mode').onclick = toggleMode;
 function setPaintEnabled(enabled) {
     paint = enabled;
     lastPaintPosition = null;
-    document.getElementById('paint').textContent = `Paint: ${paint ? 'ON' : 'OFF'}`;
+    document.getElementById('paint').textContent =
+        `Paint: ${paint ? 'ON' : 'OFF'}`;
 }
 
 document.getElementById('paint').onclick = () => {
@@ -197,7 +277,7 @@ document.getElementById('paint').onclick = () => {
 };
 
 document.getElementById('clearTracks').onclick = () => {
-    tracks = [];
+    clearGroundPaint();
     lastPaintPosition = null;
 };
 
@@ -224,14 +304,13 @@ function pointFromEvent(event) {
 canvas.addEventListener('contextmenu', event => {
     event.preventDefault();
 
-    if (!edit) {
-        return;
-    }
+    if (!edit) return;
 
     const point = pointFromEvent(event);
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
         const obstacle = obstacles[i];
+
         const inside =
             point.x >= obstacle.x &&
             point.x <= obstacle.x + obstacle.w &&
@@ -246,11 +325,10 @@ canvas.addEventListener('contextmenu', event => {
 });
 
 canvas.addEventListener('mousedown', event => {
-    if (!edit || event.button !== 0) {
-        return;
-    }
+    if (!edit || event.button !== 0) return;
 
     const point = pointFromEvent(event);
+
     drag = {
         x: point.x,
         y: point.y,
@@ -269,9 +347,7 @@ canvas.addEventListener('mousemove', event => {
 });
 
 canvas.addEventListener('mouseup', event => {
-    if (!drag) {
-        return;
-    }
+    if (!drag) return;
 
     const point = pointFromEvent(event);
     const x = Math.min(drag.x, point.x);
@@ -311,16 +387,14 @@ function saveStage() {
 }
 
 document.getElementById('save').onclick = saveStage;
+
 document.getElementById('loadBtn').onclick = () => {
     document.getElementById('load').click();
 };
 
 document.getElementById('load').onchange = async event => {
     const file = event.target.files[0];
-
-    if (!file) {
-        return;
-    }
+    if (!file) return;
 
     try {
         const data = JSON.parse(await file.text());
@@ -339,10 +413,6 @@ document.getElementById('load').onchange = async event => {
 // -----------------------------------------------------------------------------
 // Trailer kinematics
 // -----------------------------------------------------------------------------
-// The trailer has one rigid axle at its rear. Both wheels are free-rolling, so
-// the axle cannot move sideways relative to the trailer's own heading. The
-// trailer heading therefore changes continuously from the hitch velocity.
-// -----------------------------------------------------------------------------
 
 function trailer() {
     const drawbarLength = S.len;
@@ -355,14 +425,14 @@ function trailer() {
     const trailerHeading = car.ta;
     const omega = car.omega || 0;
 
-    // Velocity of the hitch point, including the towing vehicle's rotation.
     const hitchOffsetX = -42 * S.vs * vehicleDirectionX;
     const hitchOffsetY = -42 * S.vs * vehicleDirectionY;
 
-    const hitchVelocityX = car.v * vehicleDirectionX - omega * hitchOffsetY;
-    const hitchVelocityY = car.v * vehicleDirectionY + omega * hitchOffsetX;
+    const hitchVelocityX =
+        car.v * vehicleDirectionX - omega * hitchOffsetY;
+    const hitchVelocityY =
+        car.v * vehicleDirectionY + omega * hitchOffsetX;
 
-    // Component of hitch velocity perpendicular to the trailer.
     const sidewaysVelocity =
         -Math.sin(trailerHeading) * hitchVelocityX +
         Math.cos(trailerHeading) * hitchVelocityY;
@@ -370,13 +440,8 @@ function trailer() {
     const angularRate = sidewaysVelocity / Math.max(1, drawbarLength);
     car.ta = trailerHeading + angularRate * car.dt;
 
-    while (car.ta > Math.PI) {
-        car.ta -= 2 * Math.PI;
-    }
-
-    while (car.ta < -Math.PI) {
-        car.ta += 2 * Math.PI;
-    }
+    while (car.ta > Math.PI) car.ta -= 2 * Math.PI;
+    while (car.ta < -Math.PI) car.ta += 2 * Math.PI;
 
     const axleX = hitchX - Math.cos(car.ta) * drawbarLength;
     const axleY = hitchY - Math.sin(car.ta) * drawbarLength;
@@ -392,10 +457,6 @@ function trailer() {
 
 // -----------------------------------------------------------------------------
 // Collision detection
-// -----------------------------------------------------------------------------
-// Obstacles are axis-aligned rectangles. Vehicle and trailer bodies are
-// oriented rectangles. SAT (Separating Axis Theorem) is used so collision is
-// checked against the actual rotated bodies rather than their bounding boxes.
 // -----------------------------------------------------------------------------
 
 function rectangleCorners(centerX, centerY, width, height, angle) {
@@ -424,6 +485,7 @@ function polygonsOverlap(first, second) {
         for (let i = 0; i < polygon.length; i++) {
             const a = polygon[i];
             const b = polygon[(i + 1) % polygon.length];
+
             const edgeX = b.x - a.x;
             const edgeY = b.y - a.y;
             const axisX = -edgeY;
@@ -462,14 +524,9 @@ function vehicleAndTrailerHitObstacle(trailerState) {
     const trailerHeight = 56 * S.ts;
 
     const vehiclePolygon = rectangleCorners(
-        car.x,
-        car.y,
-        vehicleWidth,
-        vehicleHeight,
-        car.a
+        car.x, car.y, vehicleWidth, vehicleHeight, car.a
     );
 
-    // The trailer body is centered at the axle in the existing visual model.
     const trailerPolygon = rectangleCorners(
         trailerState.ax,
         trailerState.ay,
@@ -526,17 +583,13 @@ function update(dt) {
         (steeringInput - car.steer) *
         Math.min(1, dt * S.steer);
 
-    // car.steer is normalized to [-1, 1]. Convert it to the configured
-    // steering angle, then use a simple bicycle-model turn rate.
-    const steeringAngle =
-        car.steer * S.maxSteer * Math.PI / 180;
+    const steeringAngle = car.steer * S.maxSteer * Math.PI / 180;
     const vehicleWheelbase = 90 * S.vs;
-    // Keep left/right steering intuitive in both forward and reverse:
-    // reversing changes travel direction, but not the requested turn direction.
-    const turnRate = Math.tan(steeringAngle) * Math.abs(car.v) / vehicleWheelbase;
+    const turnRate =
+        Math.tan(steeringAngle) * Math.abs(car.v) / vehicleWheelbase;
+
     car.omega = turnRate;
 
-    // Save the complete state so a collision can reject the movement.
     const oldState = {
         x: car.x,
         y: car.y,
@@ -552,7 +605,6 @@ function update(dt) {
     car.y += Math.sin(car.a) * car.v * dt;
     car.dt = dt;
 
-    // Keep the towing vehicle inside the canvas.
     const vehicleRadius = 45 * S.vs;
 
     if (car.x < vehicleRadius) {
@@ -577,39 +629,45 @@ function update(dt) {
 
     let trailerState = trailer();
 
-    // Resolve collisions by trying each movement axis separately. This lets
-    // the vehicle slide along the face of a block instead of repeatedly
-    // colliding at the same point and becoming stuck.
     if (vehicleAndTrailerHitObstacle(trailerState)) {
         const attemptedState = {
-            x: car.x, y: car.y, a: car.a, ta: car.ta
+            x: car.x,
+            y: car.y,
+            a: car.a,
+            ta: car.ta
         };
 
-        // Restore the previous pose before testing alternative movements.
         car.x = oldState.x;
         car.y = oldState.y;
         car.a = oldState.a;
         car.ta = oldState.ta;
 
-        // Try sliding horizontally while keeping the attempted heading.
+        // Try sliding horizontally.
         car.x = attemptedState.x;
         car.y = oldState.y;
         car.a = attemptedState.a;
         car.ta = oldState.ta;
-        trailerState = trailer();
-        const horizontalClear = !vehicleAndTrailerHitObstacle(trailerState);
 
-        // Reset the trailer angle before trying the other axis.
+        trailerState = trailer();
+        const horizontalClear =
+            !vehicleAndTrailerHitObstacle(trailerState);
+
+        // Try sliding vertically.
         car.ta = oldState.ta;
         car.x = oldState.x;
         car.y = attemptedState.y;
         car.a = attemptedState.a;
-        trailerState = trailer();
-        const verticalClear = !vehicleAndTrailerHitObstacle(trailerState);
 
-        if (horizontalClear && (!verticalClear ||
-            Math.abs(attemptedState.x - oldState.x) >=
-            Math.abs(attemptedState.y - oldState.y))) {
+        trailerState = trailer();
+        const verticalClear =
+            !vehicleAndTrailerHitObstacle(trailerState);
+
+        if (
+            horizontalClear &&
+            (!verticalClear ||
+             Math.abs(attemptedState.x - oldState.x) >=
+             Math.abs(attemptedState.y - oldState.y))
+        ) {
             car.x = attemptedState.x;
             car.y = oldState.y;
             car.a = attemptedState.a;
@@ -622,7 +680,6 @@ function update(dt) {
             car.ta = oldState.ta;
             car.v = 0;
         } else {
-            // Neither slide is possible; stop at the last non-colliding pose.
             car.x = oldState.x;
             car.y = oldState.y;
             car.a = oldState.a;
@@ -632,14 +689,10 @@ function update(dt) {
             car.ta = oldState.ta;
         }
 
-        // Recompute the final trailer pose for painting and rendering.
         trailerState = trailer();
     }
 
-    // Paint is independent of the physics. When enabled, continuously stamp
-    // solid circles onto the ground at the trailer's rear axle. The circle
-    // diameter is approximately the trailer length, so the painted route
-    // closely follows the path taken by the vehicle/trailer.
+    // Paint the fixed ground grid. No track-point objects accumulate.
     if (paint) {
         const paintPosition = {
             x: trailerState.ax,
@@ -650,70 +703,136 @@ function update(dt) {
             const dx = paintPosition.x - lastPaintPosition.x;
             const dy = paintPosition.y - lastPaintPosition.y;
             const distance = Math.hypot(dx, dy);
-            const spacing = Math.max(2, 12 * S.ts);
+            const spacing = Math.max(
+                2,
+                GROUND_CELL_SIZE * 0.8,
+                12 * S.ts
+            );
             const steps = Math.max(1, Math.ceil(distance / spacing));
 
             for (let i = 1; i <= steps; i++) {
                 const t = i / steps;
-                tracks.push({
-                    x: lastPaintPosition.x + dx * t,
-                    y: lastPaintPosition.y + dy * t
-                });
+
+                paintGroundCircle(
+                    lastPaintPosition.x + dx * t,
+                    lastPaintPosition.y + dy * t,
+                    S.paintDiameter / 2
+                );
             }
         } else {
-            tracks.push(paintPosition);
+            paintGroundCircle(
+                paintPosition.x,
+                paintPosition.y,
+                S.paintDiameter / 2
+            );
         }
 
         lastPaintPosition = paintPosition;
-
     } else {
         lastPaintPosition = null;
     }
 }
 
 // -----------------------------------------------------------------------------
-// Rendering
+// Fixed-size ground grid and cached ground canvas
 // -----------------------------------------------------------------------------
 
-function drawGrid() {
-    ctx.fillStyle = '#d6d6d6';
-    ctx.fillRect(0, 0, W, H);
+function initializeGround() {
+    groundColumns = Math.max(1, Math.ceil(W / GROUND_CELL_SIZE));
+    groundRows = Math.max(1, Math.ceil(H / GROUND_CELL_SIZE));
 
-    ctx.strokeStyle = '#c5c5c5';
-    ctx.lineWidth = 1;
+    groundCells = new Uint8Array(groundColumns * groundRows);
+
+    groundCanvas.width = Math.max(1, W);
+    groundCanvas.height = Math.max(1, H);
+    groundCtx = groundCanvas.getContext('2d');
+
+    drawGroundBase();
+}
+
+function drawGroundBase() {
+    groundCtx.fillStyle = '#d6d6d6';
+    groundCtx.fillRect(0, 0, W, H);
+
+    groundCtx.strokeStyle = '#c5c5c5';
+    groundCtx.lineWidth = 1;
 
     for (let x = 0; x < W; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, H);
-        ctx.stroke();
+        groundCtx.beginPath();
+        groundCtx.moveTo(x, 0);
+        groundCtx.lineTo(x, H);
+        groundCtx.stroke();
     }
 
     for (let y = 0; y < H; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(W, y);
-        ctx.stroke();
+        groundCtx.beginPath();
+        groundCtx.moveTo(0, y);
+        groundCtx.lineTo(W, y);
+        groundCtx.stroke();
     }
 }
 
-function drawTracks() {
-    if (!tracks.length) {
-        return;
-    }
+function paintGroundCircle(x, y, radius) {
+    if (!groundColumns || !groundRows || radius <= 0) return;
 
-    // Each mark is a solid, bright-gray circle. Its diameter is approximately
-    // the trailer length and the marks are laid down on the ground permanently.
-    const radius = S.paintDiameter / 2;
+    const minColumn = Math.max(
+        0, Math.floor((x - radius) / GROUND_CELL_SIZE)
+    );
+    const maxColumn = Math.min(
+        groundColumns - 1,
+        Math.floor((x + radius) / GROUND_CELL_SIZE)
+    );
+    const minRow = Math.max(
+        0, Math.floor((y - radius) / GROUND_CELL_SIZE)
+    );
+    const maxRow = Math.min(
+        groundRows - 1,
+        Math.floor((y + radius) / GROUND_CELL_SIZE)
+    );
 
-    ctx.fillStyle = '#b8b8b8';
+    const radiusSquared = radius * radius;
+    groundCtx.fillStyle = '#b8b8b8';
 
-    for (const track of tracks) {
-        ctx.beginPath();
-        ctx.arc(track.x, track.y, radius, 0, Math.PI * 2);
-        ctx.fill();
+    for (let row = minRow; row <= maxRow; row++) {
+        const cellY = row * GROUND_CELL_SIZE;
+        const centerY = cellY + GROUND_CELL_SIZE / 2;
+
+        for (let column = minColumn; column <= maxColumn; column++) {
+            const cellX = column * GROUND_CELL_SIZE;
+            const centerX = cellX + GROUND_CELL_SIZE / 2;
+
+            const dx = centerX - x;
+            const dy = centerY - y;
+
+            if (dx * dx + dy * dy > radiusSquared) continue;
+
+            const index = row * groundColumns + column;
+            if (groundCells[index]) continue;
+
+            groundCells[index] = 1;
+
+            groundCtx.fillRect(
+                cellX,
+                cellY,
+                GROUND_CELL_SIZE,
+                GROUND_CELL_SIZE
+            );
+        }
     }
 }
+
+function clearGroundPaint() {
+    groundCells.fill(0);
+    drawGroundBase();
+}
+
+function drawGrid() {
+    ctx.drawImage(groundCanvas, 0, 0, W, H);
+}
+
+// -----------------------------------------------------------------------------
+// Rendering obstacles, trailer, and vehicle
+// -----------------------------------------------------------------------------
 
 function drawObstacles() {
     for (const obstacle of obstacles) {
@@ -743,6 +862,7 @@ function drawObstacles() {
 
         ctx.fillStyle = '#7778';
         ctx.fillRect(x, y, w, h);
+
         ctx.strokeStyle = '#222';
         ctx.strokeRect(x, y, w, h);
     }
@@ -762,10 +882,6 @@ function drawTrailer(trailerState) {
     ctx.fillRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
     ctx.strokeRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
 
-    // Trailer tongue: rigidly attached to the trailer.
-    // It follows the trailer's longitudinal axis and therefore keeps a fixed
-    // angle relative to the trailer body instead of pointing independently
-    // toward the hitch. The physics already constrains the hitch to this axis.
     const tongueStart = 36 * scale;
     const tongueEnd = Math.hypot(
         trailerState.hx - trailerState.ax,
@@ -779,7 +895,6 @@ function drawTrailer(trailerState) {
     ctx.lineTo(tongueEnd, 0);
     ctx.stroke();
 
-    // Two free wheels on the trailer's rear axle.
     ctx.fillStyle = '#222';
     ctx.fillRect(-47 * scale, -20 * scale, 10 * scale, 16 * scale);
     ctx.fillRect(-47 * scale, 4 * scale, 10 * scale, 16 * scale);
@@ -790,7 +905,6 @@ function drawTrailer(trailerState) {
 function drawVehicle(trailerState) {
     const scale = S.vs;
 
-    // Drawbar/hitch.
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -809,7 +923,6 @@ function drawVehicle(trailerState) {
     ctx.fillRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
     ctx.strokeRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
 
-    // Four vehicle wheels. The front pair is visually steerable with the body.
     ctx.fillStyle = '#222';
     ctx.fillRect(-46 * scale, -32 * scale, 18 * scale, 9 * scale);
     ctx.fillRect(28 * scale, -32 * scale, 18 * scale, 9 * scale);
@@ -824,8 +937,8 @@ function drawVehicle(trailerState) {
 
 function draw() {
     ctx.clearRect(0, 0, W, H);
+
     drawGrid();
-    drawTracks();
     drawObstacles();
 
     const trailerState = trailer();
@@ -852,4 +965,6 @@ function loop(time) {
 }
 
 requestAnimationFrame(loop);
-</script></body></html>
+</script>
+</body>
+</html>

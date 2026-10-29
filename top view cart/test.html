@@ -1,666 +1,970 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2D Vehicle &amp; Trailer Physics Sandbox</title>
-  <style>
-    :root {
-      --bg: #0e1116;
-      --panel: #161b22;
-      --panel-2: #1c2330;
-      --border: #2b3544;
-      --text: #e6edf3;
-      --muted: #8b9bb0;
-      --accent: #3d9cf0;
-      --accent-2: #f0b429;
-      --danger: #e85d4c;
-      --ok: #3ecf8e;
-      --sidebar: 300px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
-    #app { display: grid; grid-template-rows: 48px 1fr; grid-template-columns: 1fr var(--sidebar); height: 100%; }
-    header {
-      grid-column: 1 / -1;
-      display: flex; align-items: center; gap: 16px;
-      padding: 0 16px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-    }
-    header h1 { font-size: 14px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-    header h1 span { color: var(--text); }
-    .top-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
-    kbd { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 11px; color: var(--text); }
-    #stage-wrap { position: relative; background: #0a0d12; overflow: hidden; }
-    canvas#main { display: block; width: 100%; height: 100%; cursor: crosshair; }
-    #hud {
-      position: absolute; left: 12px; top: 12px;
-      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: #c9d4e0; pointer-events: none;
-      background: rgba(10,13,18,.55); padding: 8px 10px; border-radius: 6px;
-      border: 1px solid rgba(255,255,255,.06);
-    }
-    aside {
-      background: var(--panel);
-      border-left: 1px solid var(--border);
-      overflow-y: auto;
-      padding: 12px 14px 24px;
-    }
-    aside h2 {
-      font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-      color: var(--muted); margin: 16px 0 8px;
-      border-bottom: 1px solid var(--border); padding-bottom: 6px;
-    }
-    aside h2:first-child { margin-top: 0; }
-    .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-    button, label.file-btn {
-      background: var(--panel-2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 10px;
-      font-size: 12px;
-      cursor: pointer;
-      flex: 1 1 auto;
-    }
-    button:hover, label.file-btn:hover { border-color: var(--accent); }
-    button.active { background: #1a3a5c; border-color: var(--accent); color: #fff; }
-    button.ok { border-color: #2a6a4a; }
-    button.danger { border-color: #6a2a2a; }
-    .slider-row { margin-bottom: 10px; }
-    .slider-row label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    .slider-row label b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-    input[type=range] { width: 100%; accent-color: var(--accent); }
-    input[type=file] { display: none; }
-    .legend { font-size: 11px; color: var(--muted); line-height: 1.5; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vehicle & Trailer Sandbox</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;background:#111;color:#eee;overflow:hidden}
+.app{height:100%;display:flex;flex-direction:column}
+.top{height:48px;background:#1b1b1b;border-bottom:1px solid #333;display:flex;align-items:center;padding:0 14px;gap:20px}
+.title{font-weight:700}
+.help{font-size:12px;color:#aaa}
+.body{flex:1;display:flex;min-height:0}
+.canvasWrap{position:relative;flex:1;background:#d8d8d8}
+.canvas{display:block;width:100%;height:100%;cursor:crosshair}
+.panel{width:285px;background:#202020;border-left:1px solid #333;padding:12px;overflow:auto}
+.section{border-top:1px solid #3b3b3b;padding-top:10px;margin-top:10px}
+.section h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;margin:0 0 9px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row button{flex:1}
+.btn{border:1px solid #555;background:#303030;color:#eee;border-radius:5px;padding:7px 8px;cursor:pointer}
+.btn:hover{background:#3a3a3a}
+.btn.active{background:#555}
+.slider{width:100%}
+.val{width:42px;text-align:right;font-size:12px;color:#bbb}
+.label{font-size:13px;flex:1}
+.hint{font-size:11px;color:#999;line-height:1.35}
+.status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}
+.file{display:none}
+</style>
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>Vehicle &amp; Trailer <span>Physics Sandbox</span></h1>
-      <div class="top-hint">
-        Drive: <kbd>W</kbd>/<kbd>↑</kbd> forward · <kbd>S</kbd>/<kbd>↓</kbd> reverse · <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> steer · <kbd>Space</kbd> brake · <kbd>R</kbd> reset
-      </div>
-    </header>
-    <div id="stage-wrap">
-      <canvas id="main"></canvas>
-      <div id="hud"></div>
-    </div>
-    <aside id="dev-panel">
-      <h2>Level Editor</h2>
-      <div class="row">
-        <button id="btn-edit">Drive / Edit Mode</button>
-      </div>
-      <div class="row">
-        <button id="btn-undo">Undo Box</button>
-        <button id="btn-clear" class="danger">Clear All</button>
-      </div>
-      <p class="legend">In Edit mode, click-drag on the canvas to place axis-aligned obstacle boxes.</p>
+<div class="app">
+<header class="top">
+<div class="title">2D Vehicle & Trailer Sandbox</div>
+<div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode · R reset position</div>
+</header>
 
-      <h2>Stage Development</h2>
-      <div class="row">
-        <button id="btn-save">Save Stage</button>
-        <label class="file-btn">Load Stage<input type="file" id="file-load" accept="application/json,.json"></label>
-      </div>
+<div class="body">
+<div class="canvasWrap">
+<canvas id="c" class="canvas"></canvas>
+<div id="status" class="status">DRIVE</div>
+</div>
 
-      <h2>Ground Paint</h2>
-      <div class="row">
-        <button id="btn-paint">Paint Toggle</button>
-        <button id="btn-clear-paint">Clear Tracks</button>
-      </div>
+<aside class="panel">
+<div class="section" style="border-top:0;margin-top:0;padding-top:0">
+<h3>Level Editor</h3>
+<div class="row"><button id="mode" class="btn">Switch to Edit Mode</button></div>
+<div class="row">
+<button id="undo" class="btn">Undo Last Obstacle</button>
+<button id="clear" class="btn">Clear All</button>
+</div>
+</div>
 
-      <h2>Safety &amp; Physics</h2>
-      <div class="row">
-        <button id="btn-jack" class="active">Jackknife Guard</button>
-      </div>
-      <div class="slider-row">
-        <label>Fwd Speed <b id="v-maxSpeed">1.50</b></label>
-        <input type="range" id="s-maxSpeed" min="1" max="10" step="0.1" value="1.5">
-      </div>
-      <div class="slider-row">
-        <label>Rev Speed <b id="v-maxBackwardsSpeed">-1.10</b></label>
-        <input type="range" id="s-maxBackwardsSpeed" min="-5" max="-0.5" step="0.1" value="-1.1">
-      </div>
-      <div class="slider-row">
-        <label>Steer Stiff <b id="v-steerStiffness">2.00</b></label>
-        <input type="range" id="s-steerStiffness" min="0.5" max="4" step="0.05" value="2">
-      </div>
-      <div class="slider-row">
-        <label>Trailer Len <b id="v-trailerLength">85</b></label>
-        <input type="range" id="s-trailerLength" min="30" max="150" step="1" value="85">
-      </div>
-      <div class="slider-row">
-        <label>Joint Fric <b id="v-jointFriction">0.50</b></label>
-        <input type="range" id="s-jointFriction" min="0" max="0.95" step="0.01" value="0.50">
-      </div>
+<div class="section">
+<h3>Stage Development</h3>
+<div class="row">
+<button id="save" class="btn">Save Stage</button>
+<button id="loadBtn" class="btn">Load Stage</button>
+<input id="load" class="file" type="file" accept=".json,application/json">
+</div>
+</div>
 
-      <h2>Dimension Scales</h2>
-      <div class="slider-row">
-        <label>Vehicle Scale <b id="v-carScale">0.80</b></label>
-        <input type="range" id="s-carScale" min="0.4" max="2.5" step="0.05" value="0.8">
-      </div>
-      <div class="slider-row">
-        <label>Trailer Scale <b id="v-trailerScale">0.70</b></label>
-        <input type="range" id="s-trailerScale" min="0.4" max="2.5" step="0.05" value="0.7">
-      </div>
-    </aside>
-  </div>
+<div class="section">
+<h3>Ground Paint</h3>
+<div class="row">
+<button id="paint" class="btn">Paint: OFF</button>
+<button id="clearTracks" class="btn">Clear Tracks</button>
+</div>
+</div>
 
-  <script>
-(function () {
-  "use strict";
+<div class="section">
+<h3>Developer Settings</h3>
+<label class="row"><span class="label">Forward Speed</span><input id="fwd" class="slider" type="range" min="40" max="400" value="170"><span id="fwdv" class="val">170</span></label>
+<label class="row"><span class="label">Reverse Speed</span><input id="rev" class="slider" type="range" min="20" max="180" value="80"><span id="revv" class="val">80</span></label>
+<label class="row"><span class="label">Steering Stiffness</span><input id="steer" class="slider" type="range" min="0.5" max="8" step="0.1" value="3"><span id="steerv" class="val">3.0</span></label>
+<label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
+<label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
+<label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
+<label class="row"><span class="label">Joint Friction</span><input id="fric" class="slider" type="range" min="0" max="10" step="0.1" value="1.5"><span id="fricv" class="val">1.5</span></label>
+</div>
 
-  const devSettings = {
-    maxSpeed: 1.5,
-    maxBackwardsSpeed: -1.1,
-    steerStiffness: 2.0,
-    trailerLength: 85,
-    jointFriction: 0.50,
-    carScale: 0.8,
-    trailerScale: 0.7,
-    editMode: false,
-    jackknifeLock: true,
-    maxHitchAngleDeg: 65,
-    isPainting: false
-  };
+<div class="section">
+<h3>Dimension Scales</h3>
+<label class="row"><span class="label">Vehicle Scale</span><input id="vs" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="vsv" class="val">1.00</span></label>
+<label class="row"><span class="label">Trailer Scale</span><input id="ts" class="slider" type="range" min="0.5" max="2" step="0.05" value="1"><span id="tsv" class="val">1.00</span></label>
+</div>
 
-  const keys = Object.create(null);
-  const obstacles = [];
-  let draftBox = null;
+<div class="section hint">
+Drive mode: press R to reset the vehicle and trailer to their initial position.
+Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor.
+Stage files contain obstacles and current settings.
+</div>
+</aside>
+</div>
+</div>
 
-  const canvas = document.getElementById("main");
-  const ctx = canvas.getContext("2d");
-  const hudEl = document.getElementById("hud");
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
 
-  const paintCanvas = document.createElement("canvas");
-  const pctx = paintCanvas.getContext("2d");
+let W = 0;
+let H = 0;
+let dpr = 1;
 
-  let W = 800, H = 600, dpr = 1;
+// Fixed-size ground grid and cached off-screen canvas.
+// These declarations must occur before the first resize() call.
+const GROUND_CELL_SIZE = 5;
+let groundCanvas = document.createElement('canvas');
+let groundCtx = groundCanvas.getContext('2d');
+let groundColumns = 0;
+let groundRows = 0;
+let groundCells = new Uint8Array(0);
 
-  function resize() {
-    const wrap = document.getElementById("stage-wrap");
-    dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    W = wrap.clientWidth;
-    H = wrap.clientHeight;
-    canvas.width = Math.floor(W * dpr);
-    canvas.height = Math.floor(H * dpr);
-    canvas.style.width = W + "px";
-    canvas.style.height = H + "px";
+function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = canvas.clientWidth;
+    H = canvas.clientHeight;
+
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const old = document.createElement("canvas");
-    old.width = paintCanvas.width;
-    old.height = paintCanvas.height;
-    old.getContext("2d").drawImage(paintCanvas, 0, 0);
-    paintCanvas.width = canvas.width;
-    paintCanvas.height = canvas.height;
-    pctx.setTransform(1, 0, 0, 1, 0, 0);
-    pctx.drawImage(old, 0, 0, paintCanvas.width, paintCanvas.height);
-  }
-  window.addEventListener("resize", resize);
-  resize();
+    initializeGround();
+}
 
-  const CAR = { w: 36, h: 18, wheelbase: 26, hitchBehindAxle: 14 };
-  const TRAILER = { w: 48, h: 20 };
+window.addEventListener('resize', resize);
+resize();
 
-  const vehicle = {
-    x: 280, y: 280, heading: 0, steer: 0, speed: 0, trailerHeading: 0
-  };
+// -----------------------------------------------------------------------------
+// Simulation settings and state
+// -----------------------------------------------------------------------------
 
-  function resetVehicle() {
-    vehicle.x = W * 0.35;
-    vehicle.y = H * 0.5;
-    vehicle.heading = 0;
-    vehicle.steer = 0;
-    vehicle.speed = 0;
-    vehicle.trailerHeading = 0;
-  }
+const settings = {
+    fwd: 96,
+    rev: 80,
+    steer: 7.7,
+    maxSteer: 57,
+    paintDiameter: 60,
+    len: 137,
+    fric: 8,
+    vs: 1,
+    ts: 1
+};
 
-  function carDims() {
-    const s = devSettings.carScale;
-    return {
-      w: CAR.w * s, h: CAR.h * s,
-      wheelbase: CAR.wheelbase * s,
-      hitchBehind: CAR.hitchBehindAxle * s
-    };
-  }
-  function trailerDims() {
-    const s = devSettings.trailerScale;
-    return { w: TRAILER.w * s, h: TRAILER.h * s, length: devSettings.trailerLength };
-  }
+const S = { ...settings };
 
-  function hitchPos() {
-    const c = carDims();
-    return {
-      x: vehicle.x - Math.cos(vehicle.heading) * c.hitchBehind,
-      y: vehicle.y - Math.sin(vehicle.heading) * c.hitchBehind
-    };
-  }
-  function trailerAxle() {
-    const t = trailerDims();
-    const h = hitchPos();
-    return {
-      x: h.x - Math.cos(vehicle.trailerHeading) * t.length,
-      y: h.y - Math.sin(vehicle.trailerHeading) * t.length
-    };
-  }
-  function boomTip() {
-    const t = trailerDims();
-    const axle = trailerAxle();
-    const extra = t.w * 0.42;
-    return {
-      x: axle.x - Math.cos(vehicle.trailerHeading) * extra,
-      y: axle.y - Math.sin(vehicle.trailerHeading) * extra
-    };
-  }
+let edit = false;
+let paint = false;
+let keys = {};
+let obstacles = [];
+let lastPaintPosition = null;
+let drag = null;
+let lastMouse = { x: 0, y: 0 };
 
-  function wrapAngle(a) {
-    while (a > Math.PI) a -= Math.PI * 2;
-    while (a < -Math.PI) a += Math.PI * 2;
-    return a;
-  }
-  function hitchAngle() {
-    return wrapAngle(vehicle.trailerHeading - vehicle.heading);
-  }
+const car = {
+    x: W * 0.42,
+    y: H * 0.55,
+    a: 0,
+    v: 0,
+    steer: 0,
+    omega: 0,
+    dt: 0,
+    ta: 0
+};
 
-  const input = { throttle: 0, steer: 0, brake: 0 };
+const initialVehicleState = {
+    x: W * 0.42,
+    y: H * 0.55,
+    a: 0,
+    ta: 0
+};
 
-  window.addEventListener("keydown", (e) => {
-    keys[e.code] = true;
-    if (e.code === "KeyR") resetVehicle();
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
-  });
-  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+function resetVehicle() {
+    car.x = initialVehicleState.x;
+    car.y = initialVehicleState.y;
+    car.a = initialVehicleState.a;
+    car.ta = initialVehicleState.ta;
+    car.v = 0;
+    car.steer = 0;
+    car.omega = 0;
+    lastPaintPosition = null;
+}
 
-  function readInput() {
-    if (devSettings.editMode) {
-      input.throttle = 0; input.steer = 0; input.brake = 1;
-      return;
+// -----------------------------------------------------------------------------
+// Developer controls
+// -----------------------------------------------------------------------------
+
+const settingFormats = {
+    fwd: value => value,
+    rev: value => value,
+    steer: value => value.toFixed(1),
+    maxSteer: value => `${value}°`,
+    paintDiameter: value => value,
+    len: value => value,
+    fric: value => value.toFixed(1),
+    vs: value => value.toFixed(2),
+    ts: value => value.toFixed(2)
+};
+
+function syncSettingsToUI() {
+    for (const key of Object.keys(settings)) {
+        const element = document.getElementById(key);
+        const valueElement = document.getElementById(`${key}v`);
+
+        if (!element || !valueElement) continue;
+
+        element.value = S[key];
+        valueElement.textContent = settingFormats[key](Number(S[key]));
     }
-    const up = keys.KeyW || keys.ArrowUp;
-    const down = keys.KeyS || keys.ArrowDown;
-    const left = keys.KeyA || keys.ArrowLeft;
-    const right = keys.KeyD || keys.ArrowRight;
-    input.throttle = (up ? 1 : 0) + (down ? -1 : 0);
-    input.steer = (left ? -1 : 0) + (right ? 1 : 0);
-    input.brake = keys.Space ? 1 : 0;
-  }
+}
 
-  function cornersOf(cx, cy, heading, w, h) {
-    const hw = w / 2, hh = h / 2;
-    const c = Math.cos(heading), s = Math.sin(heading);
-    const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
-    return pts.map(([lx, ly]) => ({ x: cx + lx * c - ly * s, y: cy + lx * s + ly * c }));
-  }
+function bind(id, key) {
+    const element = document.getElementById(id);
 
-  function satOverlap(a, b) {
-    const axes = [];
-    for (const poly of [a, b]) {
-      for (let i = 0; i < poly.length; i++) {
-        const p = poly[i], q = poly[(i + 1) % poly.length];
-        const nx = -(q.y - p.y), ny = q.x - p.x;
-        const len = Math.hypot(nx, ny) || 1;
-        axes.push({ x: nx / len, y: ny / len });
-      }
+    element.oninput = () => {
+        S[key] = Number(element.value);
+        syncSettingsToUI();
+    };
+}
+
+for (const key of Object.keys(settings)) {
+    bind(key, key);
+}
+
+syncSettingsToUI();
+
+// -----------------------------------------------------------------------------
+// Keyboard controls
+// -----------------------------------------------------------------------------
+
+window.addEventListener('keydown', event => {
+    keys[event.key] = true;
+
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+        event.preventDefault();
     }
-    for (const axis of axes) {
-      let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
-      for (const p of a) {
-        const d = p.x * axis.x + p.y * axis.y;
-        if (d < minA) minA = d; if (d > maxA) maxA = d;
-      }
-      for (const p of b) {
-        const d = p.x * axis.x + p.y * axis.y;
-        if (d < minB) minB = d; if (d > maxB) maxB = d;
-      }
-      if (maxA < minB || maxB < minA) return false;
-    }
-    return true;
-  }
 
-  function rectPoly(box) {
-    return [
-      { x: box.x, y: box.y },
-      { x: box.x + box.w, y: box.y },
-      { x: box.x + box.w, y: box.y + box.h },
-      { x: box.x, y: box.y + box.h }
+    if (event.key === ' ' && !event.repeat) {
+        setPaintEnabled(!paint);
+    }
+
+    if (event.key.toLowerCase() === 'm') {
+        toggleMode();
+    }
+
+    if (event.key.toLowerCase() === 'r' && !event.repeat) {
+        resetVehicle();
+    }
+});
+
+window.addEventListener('keyup', event => {
+    keys[event.key] = false;
+});
+
+function toggleMode() {
+    edit = !edit;
+    document.getElementById('mode').textContent =
+        edit ? 'Switch to Drive Mode' : 'Switch to Edit Mode';
+    document.getElementById('status').textContent =
+        edit ? 'EDIT MODE' : 'DRIVE';
+    canvas.style.cursor = edit ? 'crosshair' : 'default';
+}
+
+document.getElementById('mode').onclick = toggleMode;
+
+function setPaintEnabled(enabled) {
+    paint = enabled;
+    lastPaintPosition = null;
+    document.getElementById('paint').textContent =
+        `Paint: ${paint ? 'ON' : 'OFF'}`;
+}
+
+document.getElementById('paint').onclick = () => {
+    setPaintEnabled(!paint);
+};
+
+document.getElementById('clearTracks').onclick = () => {
+    clearGroundPaint();
+    lastPaintPosition = null;
+};
+
+document.getElementById('clear').onclick = () => {
+    obstacles = [];
+};
+
+document.getElementById('undo').onclick = () => {
+    obstacles.pop();
+};
+
+// -----------------------------------------------------------------------------
+// Level editing
+// -----------------------------------------------------------------------------
+
+function pointFromEvent(event) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+    };
+}
+
+canvas.addEventListener('contextmenu', event => {
+    event.preventDefault();
+
+    if (!edit) return;
+
+    const point = pointFromEvent(event);
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obstacle = obstacles[i];
+
+        const inside =
+            point.x >= obstacle.x &&
+            point.x <= obstacle.x + obstacle.w &&
+            point.y >= obstacle.y &&
+            point.y <= obstacle.y + obstacle.h;
+
+        if (inside) {
+            obstacles.splice(i, 1);
+            break;
+        }
+    }
+});
+
+canvas.addEventListener('mousedown', event => {
+    if (!edit || event.button !== 0) return;
+
+    const point = pointFromEvent(event);
+
+    drag = {
+        x: point.x,
+        y: point.y,
+        x2: point.x,
+        y2: point.y
+    };
+});
+
+canvas.addEventListener('mousemove', event => {
+    lastMouse = pointFromEvent(event);
+
+    if (drag) {
+        drag.x2 = lastMouse.x;
+        drag.y2 = lastMouse.y;
+    }
+});
+
+canvas.addEventListener('mouseup', event => {
+    if (!drag) return;
+
+    const point = pointFromEvent(event);
+    const x = Math.min(drag.x, point.x);
+    const y = Math.min(drag.y, point.y);
+    const w = Math.abs(point.x - drag.x);
+    const h = Math.abs(point.y - drag.y);
+
+    if (w > 8 && h > 8) {
+        obstacles.push({ x, y, w, h });
+    }
+
+    drag = null;
+});
+
+// -----------------------------------------------------------------------------
+// Stage save/load
+// -----------------------------------------------------------------------------
+
+function saveStage() {
+    const data = {
+        obstacles,
+        S
+    };
+
+    const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data, null, 2)], {
+            type: 'application/json'
+        })
+    );
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'stage.json';
+    link.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById('save').onclick = saveStage;
+
+document.getElementById('loadBtn').onclick = () => {
+    document.getElementById('load').click();
+};
+
+document.getElementById('load').onchange = async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+        const data = JSON.parse(await file.text());
+        obstacles = Array.isArray(data.obstacles) ? data.obstacles : [];
+
+        if (data.S) {
+            Object.assign(S, data.S);
+        }
+
+        syncSettingsToUI();
+    } catch (error) {
+        alert('Invalid stage file');
+    }
+};
+
+// -----------------------------------------------------------------------------
+// Trailer kinematics
+// -----------------------------------------------------------------------------
+
+function trailer() {
+    const drawbarLength = S.len;
+    const vehicleDirectionX = Math.cos(car.a);
+    const vehicleDirectionY = Math.sin(car.a);
+
+    const hitchX = car.x - vehicleDirectionX * 42 * S.vs;
+    const hitchY = car.y - vehicleDirectionY * 42 * S.vs;
+
+    const trailerHeading = car.ta;
+    const omega = car.omega || 0;
+
+    const hitchOffsetX = -42 * S.vs * vehicleDirectionX;
+    const hitchOffsetY = -42 * S.vs * vehicleDirectionY;
+
+    const hitchVelocityX =
+        car.v * vehicleDirectionX - omega * hitchOffsetY;
+    const hitchVelocityY =
+        car.v * vehicleDirectionY + omega * hitchOffsetX;
+
+    const sidewaysVelocity =
+        -Math.sin(trailerHeading) * hitchVelocityX +
+        Math.cos(trailerHeading) * hitchVelocityY;
+
+    const angularRate = sidewaysVelocity / Math.max(1, drawbarLength);
+    car.ta = trailerHeading + angularRate * car.dt;
+
+    while (car.ta > Math.PI) car.ta -= 2 * Math.PI;
+    while (car.ta < -Math.PI) car.ta += 2 * Math.PI;
+
+    const axleX = hitchX - Math.cos(car.ta) * drawbarLength;
+    const axleY = hitchY - Math.sin(car.ta) * drawbarLength;
+
+    return {
+        hx: hitchX,
+        hy: hitchY,
+        ax: axleX,
+        ay: axleY,
+        a: car.ta
+    };
+}
+
+// -----------------------------------------------------------------------------
+// Collision detection
+// -----------------------------------------------------------------------------
+
+function rectangleCorners(centerX, centerY, width, height, angle) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    const localCorners = [
+        [-halfWidth, -halfHeight],
+        [halfWidth, -halfHeight],
+        [halfWidth, halfHeight],
+        [-halfWidth, halfHeight]
     ];
-  }
 
-  function colliding(cx, cy, heading, w, h) {
-    const poly = cornersOf(cx, cy, heading, w, h);
-    for (const ob of obstacles) {
-      if (satOverlap(poly, rectPoly(ob))) return true;
+    return localCorners.map(([x, y]) => ({
+        x: centerX + x * cos - y * sin,
+        y: centerY + x * sin + y * cos
+    }));
+}
+
+function polygonsOverlap(first, second) {
+    const polygons = [first, second];
+
+    for (const polygon of polygons) {
+        for (let i = 0; i < polygon.length; i++) {
+            const a = polygon[i];
+            const b = polygon[(i + 1) % polygon.length];
+
+            const edgeX = b.x - a.x;
+            const edgeY = b.y - a.y;
+            const axisX = -edgeY;
+            const axisY = edgeX;
+
+            let firstMin = Infinity;
+            let firstMax = -Infinity;
+            let secondMin = Infinity;
+            let secondMax = -Infinity;
+
+            for (const point of first) {
+                const projection = point.x * axisX + point.y * axisY;
+                firstMin = Math.min(firstMin, projection);
+                firstMax = Math.max(firstMax, projection);
+            }
+
+            for (const point of second) {
+                const projection = point.x * axisX + point.y * axisY;
+                secondMin = Math.min(secondMin, projection);
+                secondMax = Math.max(secondMax, projection);
+            }
+
+            if (firstMax < secondMin || secondMax < firstMin) {
+                return false;
+            }
+        }
     }
+
+    return true;
+}
+
+function vehicleAndTrailerHitObstacle(trailerState) {
+    const vehicleWidth = 90 * S.vs;
+    const vehicleHeight = 50 * S.vs;
+    const trailerWidth = 84 * S.ts;
+    const trailerHeight = 56 * S.ts;
+
+    const vehiclePolygon = rectangleCorners(
+        car.x, car.y, vehicleWidth, vehicleHeight, car.a
+    );
+
+    const trailerPolygon = rectangleCorners(
+        trailerState.ax,
+        trailerState.ay,
+        trailerWidth,
+        trailerHeight,
+        trailerState.a
+    );
+
+    for (const obstacle of obstacles) {
+        const obstaclePolygon = [
+            { x: obstacle.x, y: obstacle.y },
+            { x: obstacle.x + obstacle.w, y: obstacle.y },
+            { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h },
+            { x: obstacle.x, y: obstacle.y + obstacle.h }
+        ];
+
+        if (
+            polygonsOverlap(vehiclePolygon, obstaclePolygon) ||
+            polygonsOverlap(trailerPolygon, obstaclePolygon)
+        ) {
+            return true;
+        }
+    }
+
     return false;
-  }
+}
 
-  let lastPaint = null;
+// -----------------------------------------------------------------------------
+// Simulation update
+// -----------------------------------------------------------------------------
 
-  function step(dt) {
-    readInput();
-    const c = carDims();
-    const t = trailerDims();
+function update(dt) {
+    const throttle =
+        (keys.ArrowUp ? 1 : 0) -
+        (keys.ArrowDown ? 1 : 0);
 
-    const maxSteer = 0.7;
-    const targetSteer = input.steer * maxSteer;
-    const k = 8 / Math.max(0.35, devSettings.steerStiffness);
-    vehicle.steer += (targetSteer - vehicle.steer) * Math.min(1, k * dt);
-    if (Math.abs(input.steer) < 0.01) {
-      vehicle.steer *= Math.pow(0.15, dt * devSettings.steerStiffness);
+    const targetSpeed = throttle > 0
+        ? S.fwd
+        : throttle < 0
+            ? -S.rev
+            : 0;
+
+    car.v += (targetSpeed - car.v) * Math.min(1, dt * 3);
+
+    if (!throttle) {
+        car.v *= Math.pow(0.12, dt);
     }
 
-    const accel = 70;
-    if (input.brake) {
-      vehicle.speed *= Math.pow(0.08, dt);
-      if (Math.abs(vehicle.speed) < 2) vehicle.speed = 0;
-    } else if (input.throttle > 0) {
-      vehicle.speed += accel * dt;
-    } else if (input.throttle < 0) {
-      vehicle.speed -= accel * dt;
+    const steeringInput =
+        (keys.ArrowRight ? 1 : 0) -
+        (keys.ArrowLeft ? 1 : 0);
+
+    car.steer +=
+        (steeringInput - car.steer) *
+        Math.min(1, dt * S.steer);
+
+    const steeringAngle = car.steer * S.maxSteer * Math.PI / 180;
+    const vehicleWheelbase = 90 * S.vs;
+    const turnRate =
+        Math.tan(steeringAngle) * Math.abs(car.v) / vehicleWheelbase;
+
+    car.omega = turnRate;
+
+    const oldState = {
+        x: car.x,
+        y: car.y,
+        a: car.a,
+        v: car.v,
+        steer: car.steer,
+        omega: car.omega,
+        ta: car.ta
+    };
+
+    car.a += turnRate * dt;
+    car.x += Math.cos(car.a) * car.v * dt;
+    car.y += Math.sin(car.a) * car.v * dt;
+    car.dt = dt;
+
+    const vehicleRadius = 45 * S.vs;
+
+    if (car.x < vehicleRadius) {
+        car.x = vehicleRadius;
+        car.v = 0;
+    }
+
+    if (car.x > W - vehicleRadius) {
+        car.x = W - vehicleRadius;
+        car.v = 0;
+    }
+
+    if (car.y < vehicleRadius) {
+        car.y = vehicleRadius;
+        car.v = 0;
+    }
+
+    if (car.y > H - vehicleRadius) {
+        car.y = H - vehicleRadius;
+        car.v = 0;
+    }
+
+    let trailerState = trailer();
+
+    if (vehicleAndTrailerHitObstacle(trailerState)) {
+        const attemptedState = {
+            x: car.x,
+            y: car.y,
+            a: car.a,
+            ta: car.ta
+        };
+
+        car.x = oldState.x;
+        car.y = oldState.y;
+        car.a = oldState.a;
+        car.ta = oldState.ta;
+
+        // Try sliding horizontally.
+        car.x = attemptedState.x;
+        car.y = oldState.y;
+        car.a = attemptedState.a;
+        car.ta = oldState.ta;
+
+        trailerState = trailer();
+        const horizontalClear =
+            !vehicleAndTrailerHitObstacle(trailerState);
+
+        // Try sliding vertically.
+        car.ta = oldState.ta;
+        car.x = oldState.x;
+        car.y = attemptedState.y;
+        car.a = attemptedState.a;
+
+        trailerState = trailer();
+        const verticalClear =
+            !vehicleAndTrailerHitObstacle(trailerState);
+
+        if (
+            horizontalClear &&
+            (!verticalClear ||
+             Math.abs(attemptedState.x - oldState.x) >=
+             Math.abs(attemptedState.y - oldState.y))
+        ) {
+            car.x = attemptedState.x;
+            car.y = oldState.y;
+            car.a = attemptedState.a;
+            car.ta = oldState.ta;
+            car.v = 0;
+        } else if (verticalClear) {
+            car.x = oldState.x;
+            car.y = attemptedState.y;
+            car.a = attemptedState.a;
+            car.ta = oldState.ta;
+            car.v = 0;
+        } else {
+            car.x = oldState.x;
+            car.y = oldState.y;
+            car.a = oldState.a;
+            car.v = 0;
+            car.steer = oldState.steer;
+            car.omega = oldState.omega;
+            car.ta = oldState.ta;
+        }
+
+        trailerState = trailer();
+    }
+
+    // Paint the fixed ground grid. No track-point objects accumulate.
+    if (paint) {
+        const paintPosition = {
+            x: trailerState.ax,
+            y: trailerState.ay
+        };
+
+        if (lastPaintPosition) {
+            const dx = paintPosition.x - lastPaintPosition.x;
+            const dy = paintPosition.y - lastPaintPosition.y;
+            const distance = Math.hypot(dx, dy);
+            const spacing = Math.max(
+                2,
+                GROUND_CELL_SIZE * 0.8,
+                12 * S.ts
+            );
+            const steps = Math.max(1, Math.ceil(distance / spacing));
+
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+
+                paintGroundCircle(
+                    lastPaintPosition.x + dx * t,
+                    lastPaintPosition.y + dy * t,
+                    S.paintDiameter / 2
+                );
+            }
+        } else {
+            paintGroundCircle(
+                paintPosition.x,
+                paintPosition.y,
+                S.paintDiameter / 2
+            );
+        }
+
+        lastPaintPosition = paintPosition;
     } else {
-      vehicle.speed *= Math.pow(0.25, dt);
+        lastPaintPosition = null;
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Fixed-size ground grid and cached ground canvas
+// -----------------------------------------------------------------------------
+
+function initializeGround() {
+    groundColumns = Math.max(1, Math.ceil(W / GROUND_CELL_SIZE));
+    groundRows = Math.max(1, Math.ceil(H / GROUND_CELL_SIZE));
+
+    groundCells = new Uint8Array(groundColumns * groundRows);
+
+    groundCanvas.width = Math.max(1, W);
+    groundCanvas.height = Math.max(1, H);
+    groundCtx = groundCanvas.getContext('2d');
+
+    drawGroundBase();
+}
+
+function drawGroundBase() {
+    groundCtx.fillStyle = '#d6d6d6';
+    groundCtx.fillRect(0, 0, W, H);
+
+    groundCtx.strokeStyle = '#c5c5c5';
+    groundCtx.lineWidth = 1;
+
+    for (let x = 0; x < W; x += 40) {
+        groundCtx.beginPath();
+        groundCtx.moveTo(x, 0);
+        groundCtx.lineTo(x, H);
+        groundCtx.stroke();
     }
 
-    const maxF = 55 * devSettings.maxSpeed;
-    const maxR = 55 * Math.abs(devSettings.maxBackwardsSpeed);
-    if (vehicle.speed > maxF) vehicle.speed = maxF;
-    if (vehicle.speed < -maxR) vehicle.speed = -maxR;
+    for (let y = 0; y < H; y += 40) {
+        groundCtx.beginPath();
+        groundCtx.moveTo(0, y);
+        groundCtx.lineTo(W, y);
+        groundCtx.stroke();
+    }
+}
 
-    const wb = Math.max(8, c.wheelbase);
-    const yawRate = (vehicle.speed / wb) * Math.tan(vehicle.steer);
+function paintGroundCircle(x, y, radius) {
+    if (!groundColumns || !groundRows || radius <= 0) return;
 
-    const prevX = vehicle.x, prevY = vehicle.y, prevH = vehicle.heading, prevTH = vehicle.trailerHeading;
+    const minColumn = Math.max(
+        0, Math.floor((x - radius) / GROUND_CELL_SIZE)
+    );
+    const maxColumn = Math.min(
+        groundColumns - 1,
+        Math.floor((x + radius) / GROUND_CELL_SIZE)
+    );
+    const minRow = Math.max(
+        0, Math.floor((y - radius) / GROUND_CELL_SIZE)
+    );
+    const maxRow = Math.min(
+        groundRows - 1,
+        Math.floor((y + radius) / GROUND_CELL_SIZE)
+    );
 
-    vehicle.heading = wrapAngle(vehicle.heading + yawRate * dt);
-    vehicle.x += Math.cos(vehicle.heading) * vehicle.speed * dt;
-    vehicle.y += Math.sin(vehicle.heading) * vehicle.speed * dt;
+    const radiusSquared = radius * radius;
+    groundCtx.fillStyle = '#b8b8b8';
 
-    const hitchVelX = vehicle.speed * Math.cos(vehicle.heading) + yawRate * c.hitchBehind * Math.sin(vehicle.heading);
-    const hitchVelY = vehicle.speed * Math.sin(vehicle.heading) - yawRate * c.hitchBehind * Math.cos(vehicle.heading);
+    for (let row = minRow; row <= maxRow; row++) {
+        const cellY = row * GROUND_CELL_SIZE;
+        const centerY = cellY + GROUND_CELL_SIZE / 2;
 
-    const th = vehicle.trailerHeading;
-    let omega = (hitchVelX * Math.sin(th) - hitchVelY * Math.cos(th)) / Math.max(12, t.length);
-    const rel = wrapAngle(vehicle.trailerHeading - vehicle.heading);
-    omega -= rel * devSettings.jointFriction * 2.2;
-    omega *= (1 - devSettings.jointFriction * 0.35);
-    vehicle.trailerHeading = wrapAngle(vehicle.trailerHeading + omega * dt);
+        for (let column = minColumn; column <= maxColumn; column++) {
+            const cellX = column * GROUND_CELL_SIZE;
+            const centerX = cellX + GROUND_CELL_SIZE / 2;
 
-    if (devSettings.jackknifeLock) {
-      const maxA = devSettings.maxHitchAngleDeg * Math.PI / 180;
-      let ha = wrapAngle(vehicle.trailerHeading - vehicle.heading);
-      if (ha > maxA) {
-        vehicle.trailerHeading = wrapAngle(vehicle.heading + maxA);
-        if (vehicle.speed < 0) vehicle.speed *= 0.85;
-      } else if (ha < -maxA) {
-        vehicle.trailerHeading = wrapAngle(vehicle.heading - maxA);
-        if (vehicle.speed < 0) vehicle.speed *= 0.85;
-      }
+            const dx = centerX - x;
+            const dy = centerY - y;
+
+            if (dx * dx + dy * dy > radiusSquared) continue;
+
+            const index = row * groundColumns + column;
+            if (groundCells[index]) continue;
+
+            groundCells[index] = 1;
+
+            groundCtx.fillRect(
+                cellX,
+                cellY,
+                GROUND_CELL_SIZE,
+                GROUND_CELL_SIZE
+            );
+        }
+    }
+}
+
+function clearGroundPaint() {
+    groundCells.fill(0);
+    drawGroundBase();
+}
+
+function drawGrid() {
+    ctx.drawImage(groundCanvas, 0, 0, W, H);
+}
+
+// -----------------------------------------------------------------------------
+// Rendering obstacles, trailer, and vehicle
+// -----------------------------------------------------------------------------
+
+function drawObstacles() {
+    for (const obstacle of obstacles) {
+        ctx.fillStyle = '#555';
+        ctx.fillRect(
+            obstacle.x,
+            obstacle.y,
+            obstacle.w,
+            obstacle.h
+        );
+
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+            obstacle.x,
+            obstacle.y,
+            obstacle.w,
+            obstacle.h
+        );
     }
 
-    const carPolyHit = colliding(vehicle.x, vehicle.y, vehicle.heading, c.w, c.h);
-    const axle = trailerAxle();
-    const trailHit = colliding(axle.x, axle.y, vehicle.trailerHeading, t.w, t.h);
-    if (carPolyHit || trailHit) {
-      vehicle.x = prevX; vehicle.y = prevY;
-      vehicle.heading = prevH; vehicle.trailerHeading = prevTH;
-      vehicle.speed *= -0.25;
+    if (drag) {
+        const x = Math.min(drag.x, drag.x2);
+        const y = Math.min(drag.y, drag.y2);
+        const w = Math.abs(drag.x2 - drag.x);
+        const h = Math.abs(drag.y2 - drag.y);
+
+        ctx.fillStyle = '#7778';
+        ctx.fillRect(x, y, w, h);
+
+        ctx.strokeStyle = '#222';
+        ctx.strokeRect(x, y, w, h);
     }
+}
 
-    const m = 20;
-    if (vehicle.x < m) vehicle.x = m;
-    if (vehicle.y < m) vehicle.y = m;
-    if (vehicle.x > W - m) vehicle.x = W - m;
-    if (vehicle.y > H - m) vehicle.y = H - m;
+function drawTrailer(trailerState) {
+    const scale = S.ts;
 
-    if (devSettings.isPainting && Math.abs(vehicle.speed) > 4) {
-      const tip = boomTip();
-      pctx.save();
-      pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      pctx.strokeStyle = "rgba(240,180,40,0.55)";
-      pctx.lineWidth = Math.max(3, 5 * devSettings.trailerScale);
-      pctx.lineCap = "round";
-      pctx.beginPath();
-      if (lastPaint) { pctx.moveTo(lastPaint.x, lastPaint.y); pctx.lineTo(tip.x, tip.y); }
-      else { pctx.moveTo(tip.x, tip.y); pctx.lineTo(tip.x + 0.1, tip.y); }
-      pctx.stroke();
-      pctx.restore();
-      lastPaint = tip;
-    } else {
-      lastPaint = null;
-    }
-  }
-
-  function drawGrid() {
     ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.04)";
-    ctx.lineWidth = 1;
-    const step = 40;
-    for (let x = 0; x <= W; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y <= H; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-    ctx.restore();
-  }
+    ctx.translate(trailerState.ax, trailerState.ay);
+    ctx.rotate(trailerState.a);
 
-  function drawRectBody(cx, cy, heading, w, h, fill, stroke) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(heading);
-    ctx.fillStyle = fill;
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, -h / 2, w, h, 3);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawWheel(cx, cy, heading, steer, s) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(heading + steer);
-    ctx.fillStyle = "#1a1f28";
-    ctx.strokeStyle = "#6a7380";
-    ctx.lineWidth = 1;
-    const ww = 7 * s, wh = 3.2 * s;
-    ctx.fillRect(-ww / 2, -wh / 2, ww, wh);
-    ctx.strokeRect(-ww / 2, -wh / 2, ww, wh);
-    ctx.restore();
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#0a0d12";
-    ctx.fillRect(0, 0, W, H);
-    drawGrid();
-    ctx.drawImage(paintCanvas, 0, 0, W, H);
-
-    for (const ob of obstacles) {
-      ctx.fillStyle = "rgba(232,93,76,0.35)";
-      ctx.strokeStyle = "rgba(232,93,76,0.9)";
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
-      ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
-    }
-    if (draftBox) {
-      ctx.fillStyle = "rgba(61,156,240,0.25)";
-      ctx.strokeStyle = "rgba(61,156,240,0.95)";
-      ctx.setLineDash([4, 3]);
-      ctx.fillRect(draftBox.x, draftBox.y, draftBox.w, draftBox.h);
-      ctx.strokeRect(draftBox.x, draftBox.y, draftBox.w, draftBox.h);
-      ctx.setLineDash([]);
-    }
-
-    const c = carDims();
-    const t = trailerDims();
-    const hitch = hitchPos();
-    const axle = trailerAxle();
-    const tip = boomTip();
-
-    ctx.beginPath();
-    ctx.moveTo(hitch.x, hitch.y);
-    ctx.lineTo(axle.x, axle.y);
-    ctx.strokeStyle = "#8b9bb0";
+    ctx.fillStyle = '#b8b8b8';
+    ctx.strokeStyle = '#222';
     ctx.lineWidth = 2;
+
+    ctx.fillRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
+    ctx.strokeRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
+
+    const tongueStart = 36 * scale;
+    const tongueEnd = Math.hypot(
+        trailerState.hx - trailerState.ax,
+        trailerState.hy - trailerState.ay
+    );
+
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 7 * scale;
+    ctx.beginPath();
+    ctx.moveTo(tongueStart, 0);
+    ctx.lineTo(tongueEnd, 0);
     ctx.stroke();
 
-    drawRectBody(axle.x, axle.y, vehicle.trailerHeading, t.w, t.h, "#2a3344", "#9aa8bc");
-    ctx.beginPath();
-    ctx.arc(tip.x, tip.y, 3.5 * devSettings.trailerScale, 0, Math.PI * 2);
-    ctx.fillStyle = devSettings.isPainting ? "#f0b429" : "#6a7380";
-    ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-47 * scale, -20 * scale, 10 * scale, 16 * scale);
+    ctx.fillRect(-47 * scale, 4 * scale, 10 * scale, 16 * scale);
 
-    const cs = devSettings.carScale;
-    const fx = vehicle.x + Math.cos(vehicle.heading) * (c.wheelbase / 2);
-    const fy = vehicle.y + Math.sin(vehicle.heading) * (c.wheelbase / 2);
-    const rx = vehicle.x - Math.cos(vehicle.heading) * (c.wheelbase / 2);
-    const ry = vehicle.y - Math.sin(vehicle.heading) * (c.wheelbase / 2);
-    const px = Math.sin(vehicle.heading), py = -Math.cos(vehicle.heading);
-    const track = c.h * 0.38;
-    drawWheel(fx + px * track, fy + py * track, vehicle.heading, vehicle.steer, cs);
-    drawWheel(fx - px * track, fy - py * track, vehicle.heading, vehicle.steer, cs);
-    drawWheel(rx + px * track, ry + py * track, vehicle.heading, 0, cs);
-    drawWheel(rx - px * track, ry - py * track, vehicle.heading, 0, cs);
-
-    drawRectBody(vehicle.x, vehicle.y, vehicle.heading, c.w, c.h, "#1e4a78", "#5eb0ff");
-    ctx.save();
-    ctx.translate(vehicle.x, vehicle.y);
-    ctx.rotate(vehicle.heading);
-    ctx.fillStyle = "rgba(180,220,255,0.25)";
-    ctx.fillRect(c.w * 0.05, -c.h * 0.32, c.w * 0.28, c.h * 0.64);
     ctx.restore();
+}
 
+function drawVehicle(trailerState) {
+    const scale = S.vs;
+
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(hitch.x, hitch.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#f0b429";
-    ctx.fill();
+    ctx.moveTo(car.x, car.y);
+    ctx.lineTo(trailerState.hx, trailerState.hy);
+    ctx.stroke();
 
-    const ha = hitchAngle() * 180 / Math.PI;
-    hudEl.innerHTML =
-      `mode: ${devSettings.editMode ? "EDIT" : "DRIVE"}<br>` +
-      `spd: ${vehicle.speed.toFixed(1)} px/s<br>` +
-      `steer: ${(vehicle.steer * 180 / Math.PI).toFixed(1)}°<br>` +
-      `hitch: ${ha.toFixed(1)}° / ${devSettings.maxHitchAngleDeg}°` +
-      (devSettings.jackknifeLock ? "  LOCK" : "") +
-      (devSettings.isPainting ? "<br>paint: ON" : "");
-  }
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.a);
 
-  let last = performance.now();
-  function loop(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
-    last = now;
-    step(dt);
+    ctx.fillStyle = '#777';
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2;
+
+    ctx.fillRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
+    ctx.strokeRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
+
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-46 * scale, -32 * scale, 18 * scale, 9 * scale);
+    ctx.fillRect(28 * scale, -32 * scale, 18 * scale, 9 * scale);
+    ctx.fillRect(-46 * scale, 23 * scale, 18 * scale, 9 * scale);
+    ctx.fillRect(28 * scale, 23 * scale, 18 * scale, 9 * scale);
+
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(12 * scale, -19 * scale, 24 * scale, 38 * scale);
+
+    ctx.restore();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    drawGrid();
+    drawObstacles();
+
+    const trailerState = trailer();
+    drawTrailer(trailerState);
+    drawVehicle(trailerState);
+}
+
+// -----------------------------------------------------------------------------
+// Main loop
+// -----------------------------------------------------------------------------
+
+let lastTime = performance.now();
+
+function loop(time) {
+    const dt = Math.min(0.04, (time - lastTime) / 1000);
+    lastTime = time;
+
+    if (!edit) {
+        update(dt);
+    }
+
     draw();
     requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-  resetVehicle();
+}
 
-  function setToggle(btn, on) { btn.classList.toggle("active", !!on); }
-
-  const btnEdit = document.getElementById("btn-edit");
-  const btnJack = document.getElementById("btn-jack");
-  const btnPaint = document.getElementById("btn-paint");
-
-  btnEdit.addEventListener("click", () => {
-    devSettings.editMode = !devSettings.editMode;
-    setToggle(btnEdit, devSettings.editMode);
-    canvas.style.cursor = devSettings.editMode ? "crosshair" : "default";
-  });
-  document.getElementById("btn-undo").addEventListener("click", () => { obstacles.pop(); });
-  document.getElementById("btn-clear").addEventListener("click", () => { obstacles.length = 0; });
-
-  document.getElementById("btn-save").addEventListener("click", () => {
-    const data = JSON.stringify({ obstacles: obstacles.map(o => ({ x: o.x, y: o.y, w: o.w, h: o.h })) }, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "stage_config.json";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-  document.getElementById("file-load").addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const json = JSON.parse(reader.result);
-        const arr = Array.isArray(json) ? json : json.obstacles;
-        if (!Array.isArray(arr)) throw new Error("no obstacles array");
-        obstacles.length = 0;
-        for (const o of arr) {
-          if (o && Number.isFinite(+o.x) && Number.isFinite(+o.y)) {
-            obstacles.push({ x: +o.x, y: +o.y, w: +o.w || 40, h: +o.h || 40 });
-          }
-        }
-      } catch (err) {
-        alert("Could not parse stage JSON: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  });
-
-  btnPaint.addEventListener("click", () => {
-    devSettings.isPainting = !devSettings.isPainting;
-    setToggle(btnPaint, devSettings.isPainting);
-  });
-  document.getElementById("btn-clear-paint").addEventListener("click", () => {
-    pctx.setTransform(1, 0, 0, 1, 0, 0);
-    pctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
-    lastPaint = null;
-  });
-  btnJack.addEventListener("click", () => {
-    devSettings.jackknifeLock = !devSettings.jackknifeLock;
-    setToggle(btnJack, devSettings.jackknifeLock);
-  });
-
-  const sliders = [
-    ["maxSpeed", (v) => v.toFixed(2)],
-    ["maxBackwardsSpeed", (v) => v.toFixed(2)],
-    ["steerStiffness", (v) => v.toFixed(2)],
-    ["trailerLength", (v) => String(Math.round(v))],
-    ["jointFriction", (v) => v.toFixed(2)],
-    ["carScale", (v) => v.toFixed(2)],
-    ["trailerScale", (v) => v.toFixed(2)]
-  ];
-  for (const [key, fmt] of sliders) {
-    const el = document.getElementById("s-" + key);
-    const lab = document.getElementById("v-" + key);
-    el.addEventListener("input", () => {
-      devSettings[key] = parseFloat(el.value);
-      lab.textContent = fmt(devSettings[key]);
-    });
-  }
-
-  function canvasPoint(ev) {
-    const r = canvas.getBoundingClientRect();
-    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
-  }
-  canvas.addEventListener("mousedown", (ev) => {
-    if (!devSettings.editMode || ev.button !== 0) return;
-    const p = canvasPoint(ev);
-    draftBox = { x: p.x, y: p.y, w: 0, h: 0, ox: p.x, oy: p.y };
-  });
-  window.addEventListener("mousemove", (ev) => {
-    if (!draftBox) return;
-    const p = canvasPoint(ev);
-    draftBox.x = Math.min(draftBox.ox, p.x);
-    draftBox.y = Math.min(draftBox.oy, p.y);
-    draftBox.w = Math.abs(p.x - draftBox.ox);
-    draftBox.h = Math.abs(p.y - draftBox.oy);
-  });
-  window.addEventListener("mouseup", () => {
-    if (!draftBox) return;
-    if (draftBox.w > 6 && draftBox.h > 6) {
-      obstacles.push({ x: draftBox.x, y: draftBox.y, w: draftBox.w, h: draftBox.h });
-    }
-    draftBox = null;
-  });
-})();
-  </script>
+requestAnimationFrame(loop);
+</script>
 </body>
 </html>
