@@ -27,6 +27,10 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 .label{font-size:13px;flex:1}
 .hint{font-size:11px;color:#999;line-height:1.35}
 .status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}
+.gearOverlay{position:absolute;left:10px;bottom:10px;background:#000b;border:1px solid #555;padding:8px 11px;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;min-width:112px}
+.gearNumber{font-size:20px;line-height:1}
+.gearDirection{font-size:20px;line-height:1;color:#ddd}
+.gearLabel{font-size:10px;color:#aaa;font-weight:500;letter-spacing:.06em}
 .file{display:none}
 </style>
 </head>
@@ -34,13 +38,14 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <div class="app">
 <header class="top">
 <div class="title">2D Vehicle & Trailer Sandbox</div>
-<div class="help">Drive: ↑ ↓ accelerate · ← → steer · Space paint · M edit mode · R reset position</div>
+<div class="help">Drive: ↑ accelerate · ↓ brake · ← → steer · Q/A shift · TAB direction · Space paint · M edit mode · R reset</div>
 </header>
 
 <div class="body">
 <div class="canvasWrap">
 <canvas id="c" class="canvas"></canvas>
 <div id="status" class="status">DRIVE</div>
+<div id="gearOverlay" class="gearOverlay"><div><div class="gearLabel">GEAR</div><div id="gearNumber" class="gearNumber">1</div></div><div id="gearDirection" class="gearDirection" aria-label="Forward direction">↑</div></div>
 </div>
 
 <aside class="panel">
@@ -72,13 +77,12 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 
 <div class="section">
 <h3>Developer Settings</h3>
-<label class="row"><span class="label">Forward Speed</span><input id="fwd" class="slider" type="range" min="40" max="400" value="170"><span id="fwdv" class="val">170</span></label>
-<label class="row"><span class="label">Reverse Speed</span><input id="rev" class="slider" type="range" min="20" max="180" value="80"><span id="revv" class="val">80</span></label>
+<label class="row"><span class="label">Base Speed</span><input id="baseSpeed" class="slider" type="range" min="40" max="400" value="170"><span id="baseSpeedv" class="val">170</span></label>
+<label class="row"><span class="label">Reverse Multiplier</span><input id="reverseMultiplier" class="slider" type="range" min="-1.5" max="-0.25" step="0.05" value="-1"><span id="reverseMultiplierv" class="val">-1.00×</span></label>
 <label class="row"><span class="label">Steering Stiffness</span><input id="steer" class="slider" type="range" min="0.5" max="8" step="0.1" value="3"><span id="steerv" class="val">3.0</span></label>
 <label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
 <label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
-<label class="row"><span class="label">Joint Friction</span><input id="fric" class="slider" type="range" min="0" max="10" step="0.1" value="1.5"><span id="fricv" class="val">1.5</span></label>
 </div>
 
 <div class="section">
@@ -133,13 +137,12 @@ resize();
 // -----------------------------------------------------------------------------
 
 const settings = {
-    fwd: 96,
-    rev: 80,
+    baseSpeed: 96,
+    reverseMultiplier: -1,
     steer: 7.7,
     maxSteer: 57,
     paintDiameter: 60,
     len: 137,
-    fric: 8,
     vs: 1,
     ts: 1
 };
@@ -149,6 +152,8 @@ const S = { ...settings };
 let edit = false;
 let paint = false;
 let keys = {};
+let currentGear = 1;
+let driveDirection = 1; // 1 = forward, -1 = reverse
 let obstacles = [];
 let lastPaintPosition = null;
 let drag = null;
@@ -188,13 +193,12 @@ function resetVehicle() {
 // -----------------------------------------------------------------------------
 
 const settingFormats = {
-    fwd: value => value,
-    rev: value => value,
+    baseSpeed: value => value,
+    reverseMultiplier: value => `${value.toFixed(2)}×`,
     steer: value => value.toFixed(1),
     maxSteer: value => `${value}°`,
     paintDiameter: value => value,
     len: value => value,
-    fric: value => value.toFixed(1),
     vs: value => value.toFixed(2),
     ts: value => value.toFixed(2)
 };
@@ -227,21 +231,53 @@ for (const key of Object.keys(settings)) {
 syncSettingsToUI();
 
 // -----------------------------------------------------------------------------
+function updateGearOverlay() {
+    document.getElementById('gearNumber').textContent = String(currentGear);
+    const direction = document.getElementById('gearDirection');
+    direction.textContent = driveDirection === 1 ? '↑' : '↓';
+    direction.setAttribute('aria-label',
+        driveDirection === 1 ? 'Forward direction' : 'Reverse direction');
+}
+
+function shiftGear(amount) {
+    currentGear = Math.max(1, Math.min(5, currentGear + amount));
+    updateGearOverlay();
+}
+
+function toggleDriveDirection() {
+    driveDirection *= -1;
+    updateGearOverlay();
+}
+
+updateGearOverlay();
+
 // Keyboard controls
 // -----------------------------------------------------------------------------
 
 window.addEventListener('keydown', event => {
     keys[event.key] = true;
 
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Tab'].includes(event.key)) {
         event.preventDefault();
+    }
+
+    if (event.key.toLowerCase() === 'q' && !event.repeat) {
+        shiftGear(1);
+    }
+
+    if (event.key.toLowerCase() === 'a' && !event.repeat) {
+        shiftGear(-1);
+    }
+
+    if (event.key === 'Tab' && !event.repeat) {
+        toggleDriveDirection();
     }
 
     if (event.key === ' ' && !event.repeat) {
         setPaintEnabled(!paint);
     }
 
-    if (event.key.toLowerCase() === 'm') {
+    if (event.key.toLowerCase() === 'm' && !event.repeat) {
         toggleMode();
     }
 
@@ -401,7 +437,11 @@ document.getElementById('load').onchange = async event => {
         obstacles = Array.isArray(data.obstacles) ? data.obstacles : [];
 
         if (data.S) {
-            Object.assign(S, data.S);
+            for (const key of Object.keys(settings)) {
+                if (Number.isFinite(Number(data.S[key])) && data.S[key] !== null) {
+                    S[key] = Number(data.S[key]);
+                }
+            }
         }
 
         syncSettingsToUI();
@@ -559,19 +599,16 @@ function vehicleAndTrailerHitObstacle(trailerState) {
 // -----------------------------------------------------------------------------
 
 function update(dt) {
-    const throttle =
-        (keys.ArrowUp ? 1 : 0) -
-        (keys.ArrowDown ? 1 : 0);
-
-    const targetSpeed = throttle > 0
-        ? S.fwd
-        : throttle < 0
-            ? -S.rev
-            : 0;
+    const gearRatio = currentGear; // Gear ratios: 1:1 through 5:1.
+    const directionMultiplier =
+        driveDirection === 1 ? 1 : S.reverseMultiplier;
+    const targetSpeed = keys.ArrowUp && !keys.ArrowDown
+        ? S.baseSpeed * gearRatio * directionMultiplier
+        : 0;
 
     car.v += (targetSpeed - car.v) * Math.min(1, dt * 3);
 
-    if (!throttle) {
+    if (!keys.ArrowUp || keys.ArrowDown) {
         car.v *= Math.pow(0.12, dt);
     }
 

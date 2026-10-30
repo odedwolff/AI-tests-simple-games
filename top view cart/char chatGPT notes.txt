@@ -13,3 +13,7 @@ BUGS AND ISSUES
 TODO FEATURE 
 
 ADD MANUAL GEAR STICK
+
+and a steering wheel graphics?
+
+make the front wheels dynamically rotate 
