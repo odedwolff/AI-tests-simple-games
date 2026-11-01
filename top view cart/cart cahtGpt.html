@@ -919,6 +919,34 @@ function drawTrailer(trailerState) {
     ctx.fillRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
     ctx.strokeRect(-42 * scale, -28 * scale, 84 * scale, 56 * scale);
 
+    // Trailer wheels sit on the calculated axle/pivot and remain fixed
+    // relative to the trailer body (they do not steer independently).
+    const wheelLength = 28.6 * scale;
+    const wheelWidth = 14 * scale;
+
+    function drawTrailerWheel(x, y) {
+        ctx.save();
+        ctx.translate(x * scale, y * scale);
+        ctx.fillStyle = '#222';
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(
+            -wheelLength / 2,
+            -wheelWidth / 2,
+            wheelLength,
+            wheelWidth,
+            4 * scale
+        );
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // The pair is centered on the trailer's axle position.
+    drawTrailerWheel(0, -32);
+    drawTrailerWheel(0, 32);
+
     const tongueStart = 36 * scale;
     const tongueEnd = Math.hypot(
         trailerState.hx - trailerState.ax,
@@ -931,10 +959,6 @@ function drawTrailer(trailerState) {
     ctx.moveTo(tongueStart, 0);
     ctx.lineTo(tongueEnd, 0);
     ctx.stroke();
-
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-47 * scale, -20 * scale, 10 * scale, 16 * scale);
-    ctx.fillRect(-47 * scale, 4 * scale, 10 * scale, 16 * scale);
 
     ctx.restore();
 }
@@ -961,7 +985,7 @@ function drawVehicle(trailerState) {
     ctx.strokeRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
 
     // Draw the wheels individually so the front pair can pivot with steering.
-    const wheelLength = 22 * scale;
+    const wheelLength = 28.6 * scale;
     const wheelWidth = 14 * scale;
     const frontSteeringAngle = car.steer * S.maxSteer * Math.PI / 180;
 
@@ -1030,4 +1054,4 @@ function loop(time) {
 requestAnimationFrame(loop);
 </script>
 </body>
-</html>
+</html>	
