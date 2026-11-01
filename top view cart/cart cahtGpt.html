@@ -82,6 +82,7 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <label class="row"><span class="label">Steering Stiffness</span><input id="steer" class="slider" type="range" min="0.5" max="8" step="0.1" value="3"><span id="steerv" class="val">3.0</span></label>
 <label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
 <label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
+<label class="row"><span class="label">Grass Regrowth (GR)</span><input id="GR" class="slider" type="range" min="1" max="60" step="0.5" value="11.5"><span id="GRv" class="val">11.5s</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
 </div>
 
@@ -116,6 +117,8 @@ let groundCtx = groundCanvas.getContext('2d');
 let groundColumns = 0;
 let groundRows = 0;
 let groundCells = new Uint8Array(0);
+let grassGrowthAccumulator = 0;
+const GRASS_COLORS = ['#62df55', '#52c94a', '#43ae40', '#358f36', '#286f2e', '#1d5427'];
 
 function resize() {
     dpr = window.devicePixelRatio || 1;
@@ -142,6 +145,7 @@ const settings = {
     steer: 7.7,
     maxSteer: 57,
     paintDiameter: 60,
+    GR: 11.5,
     len: 137,
     vs: 1,
     ts: 1
@@ -153,7 +157,7 @@ let edit = false;
 let paint = false;
 let keys = {};
 let currentGear = 1;
-let driveDirection = 1; // 1 = forward, -1 = reverse
+let driveDirection = 1;
 let obstacles = [];
 let lastPaintPosition = null;
 let drag = null;
@@ -198,6 +202,7 @@ const settingFormats = {
     steer: value => value.toFixed(1),
     maxSteer: value => `${value}°`,
     paintDiameter: value => value,
+    GR: value => `${value.toFixed(1)}s`,
     len: value => value,
     vs: value => value.toFixed(2),
     ts: value => value.toFixed(2)
@@ -599,7 +604,7 @@ function vehicleAndTrailerHitObstacle(trailerState) {
 // -----------------------------------------------------------------------------
 
 function update(dt) {
-    const gearRatio = currentGear; // Gear ratios: 1:1 through 5:1.
+    const gearRatio = currentGear;
     const directionMultiplier =
         driveDirection === 1 ? 1 : S.reverseMultiplier;
     const targetSpeed = keys.ArrowUp && !keys.ArrowDown
@@ -729,14 +734,34 @@ function update(dt) {
         trailerState = trailer();
     }
 
+    // Grass regrows in discrete stages, once every GR seconds.
+    grassGrowthAccumulator += dt;
+    let grassChanged = false;
+    while (grassGrowthAccumulator >= S.GR) {
+        grassGrowthAccumulator -= S.GR;
+        for (let row = 0; row < groundRows; row++) {
+            const y = row * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+            for (let column = 0; column < groundColumns; column++) {
+                const index = row * groundColumns + column;
+                if (groundCells[index] >= 5) continue;
+                const x = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+                if (isPointInsideObstacle(x, y)) continue;
+                groundCells[index]++;
+                grassChanged = true;
+            }
+        }
+    }
+    if (grassChanged) drawGroundBase();
+
     // Paint the fixed ground grid. No track-point objects accumulate.
     if (paint) {
         const paintPosition = {
             x: trailerState.ax,
             y: trailerState.ay
         };
-
-        if (lastPaintPosition) {
+		
+		
+		        if (lastPaintPosition) {
             const dx = paintPosition.x - lastPaintPosition.x;
             const dy = paintPosition.y - lastPaintPosition.y;
             const distance = Math.hypot(dx, dy);
@@ -778,7 +803,10 @@ function initializeGround() {
     groundColumns = Math.max(1, Math.ceil(W / GROUND_CELL_SIZE));
     groundRows = Math.max(1, Math.ceil(H / GROUND_CELL_SIZE));
 
+    // A new field starts with fully grown grass.
     groundCells = new Uint8Array(groundColumns * groundRows);
+    groundCells.fill(5);
+    grassGrowthAccumulator = 0;
 
     groundCanvas.width = Math.max(1, W);
     groundCanvas.height = Math.max(1, H);
@@ -787,20 +815,41 @@ function initializeGround() {
     drawGroundBase();
 }
 
+function isPointInsideObstacle(x, y) {
+    for (const obstacle of obstacles) {
+        if (x >= obstacle.x && x <= obstacle.x + obstacle.w &&
+            y >= obstacle.y && y <= obstacle.y + obstacle.h) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function drawGroundBase() {
-    groundCtx.fillStyle = '#d6d6d6';
+    groundCtx.fillStyle = GRASS_COLORS[5];
     groundCtx.fillRect(0, 0, W, H);
 
-    groundCtx.strokeStyle = '#c5c5c5';
-    groundCtx.lineWidth = 1;
+    for (let row = 0; row < groundRows; row++) {
+        const y = row * GROUND_CELL_SIZE;
+        for (let column = 0; column < groundColumns; column++) {
+            const level = Math.min(5, groundCells[row * groundColumns + column]);
+            groundCtx.fillStyle = GRASS_COLORS[level];
+            groundCtx.fillRect(
+                column * GROUND_CELL_SIZE, y,
+                GROUND_CELL_SIZE, GROUND_CELL_SIZE
+            );
+        }
+    }
 
+    // Subtle field grid, retained from the previous ground rendering.
+    groundCtx.strokeStyle = '#00000012';
+    groundCtx.lineWidth = 1;
     for (let x = 0; x < W; x += 40) {
         groundCtx.beginPath();
         groundCtx.moveTo(x, 0);
         groundCtx.lineTo(x, H);
         groundCtx.stroke();
     }
-
     for (let y = 0; y < H; y += 40) {
         groundCtx.beginPath();
         groundCtx.moveTo(0, y);
@@ -812,54 +861,50 @@ function drawGroundBase() {
 function paintGroundCircle(x, y, radius) {
     if (!groundColumns || !groundRows || radius <= 0) return;
 
-    const minColumn = Math.max(
-        0, Math.floor((x - radius) / GROUND_CELL_SIZE)
-    );
-    const maxColumn = Math.min(
-        groundColumns - 1,
-        Math.floor((x + radius) / GROUND_CELL_SIZE)
-    );
-    const minRow = Math.max(
-        0, Math.floor((y - radius) / GROUND_CELL_SIZE)
-    );
-    const maxRow = Math.min(
-        groundRows - 1,
-        Math.floor((y + radius) / GROUND_CELL_SIZE)
-    );
-
+    const minColumn = Math.max(0, Math.floor((x - radius) / GROUND_CELL_SIZE));
+    const maxColumn = Math.min(groundColumns - 1, Math.floor((x + radius) / GROUND_CELL_SIZE));
+    const minRow = Math.max(0, Math.floor((y - radius) / GROUND_CELL_SIZE));
+    const maxRow = Math.min(groundRows - 1, Math.floor((y + radius) / GROUND_CELL_SIZE));
     const radiusSquared = radius * radius;
-    groundCtx.fillStyle = '#b8b8b8';
+    let changed = false;
 
     for (let row = minRow; row <= maxRow; row++) {
-        const cellY = row * GROUND_CELL_SIZE;
-        const centerY = cellY + GROUND_CELL_SIZE / 2;
-
+        const centerY = row * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
         for (let column = minColumn; column <= maxColumn; column++) {
-            const cellX = column * GROUND_CELL_SIZE;
-            const centerX = cellX + GROUND_CELL_SIZE / 2;
-
+            const centerX = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
             const dx = centerX - x;
             const dy = centerY - y;
-
             if (dx * dx + dy * dy > radiusSquared) continue;
+            if (isPointInsideObstacle(centerX, centerY)) continue;
 
             const index = row * groundColumns + column;
-            if (groundCells[index]) continue;
-
-            groundCells[index] = 1;
-
+            if (groundCells[index] === 0) continue;
+            groundCells[index] = 0;
+            groundCtx.fillStyle = GRASS_COLORS[0];
             groundCtx.fillRect(
-                cellX,
-                cellY,
-                GROUND_CELL_SIZE,
-                GROUND_CELL_SIZE
+                column * GROUND_CELL_SIZE, row * GROUND_CELL_SIZE,
+                GROUND_CELL_SIZE, GROUND_CELL_SIZE
             );
+            changed = true;
         }
     }
+    if (changed) drawGroundGridLines();
+}
+
+function drawGroundGridLines() { /*
+    groundCtx.strokeStyle = '#00000012';
+    groundCtx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+        groundCtx.beginPath(); groundCtx.moveTo(x, 0); groundCtx.lineTo(x, H); groundCtx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+        groundCtx.beginPath(); groundCtx.moveTo(0, y); groundCtx.lineTo(W, y); groundCtx.stroke();
+    }*/
 }
 
 function clearGroundPaint() {
-    groundCells.fill(0);
+    groundCells.fill(5);
+    grassGrowthAccumulator = 0;
     drawGroundBase();
 }
 
@@ -1022,6 +1067,7 @@ function drawVehicle(trailerState) {
 
     ctx.restore();
 }
+
 function draw() {
     ctx.clearRect(0, 0, W, H);
 
@@ -1054,4 +1100,4 @@ function loop(time) {
 requestAnimationFrame(loop);
 </script>
 </body>
-</html>	
+</html>
