@@ -960,18 +960,44 @@ function drawVehicle(trailerState) {
     ctx.fillRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
     ctx.strokeRect(-45 * scale, -25 * scale, 90 * scale, 50 * scale);
 
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-46 * scale, -32 * scale, 18 * scale, 9 * scale);
-    ctx.fillRect(28 * scale, -32 * scale, 18 * scale, 9 * scale);
-    ctx.fillRect(-46 * scale, 23 * scale, 18 * scale, 9 * scale);
-    ctx.fillRect(28 * scale, 23 * scale, 18 * scale, 9 * scale);
+    // Draw the wheels individually so the front pair can pivot with steering.
+    const wheelLength = 22 * scale;
+    const wheelWidth = 14 * scale;
+    const frontSteeringAngle = car.steer * S.maxSteer * Math.PI / 180;
+
+    function drawWheel(x, y, steeringAngle = 0) {
+        ctx.save();
+        ctx.translate(x * scale, y * scale);
+        ctx.rotate(steeringAngle);
+        ctx.fillStyle = '#222';
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(
+            -wheelLength / 2,
+            -wheelWidth / 2,
+            wheelLength,
+            wheelWidth,
+            4 * scale
+        );
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Front axle: wheels pivot in the direction of the steering input.
+    drawWheel(37, -28, frontSteeringAngle);
+    drawWheel(37, 28, frontSteeringAngle);
+
+    // Rear axle: fixed orientation.
+    drawWheel(-37, -28);
+    drawWheel(-37, 28);
 
     ctx.fillStyle = '#eee';
     ctx.fillRect(12 * scale, -19 * scale, 24 * scale, 38 * scale);
 
     ctx.restore();
 }
-
 function draw() {
     ctx.clearRect(0, 0, W, H);
 
