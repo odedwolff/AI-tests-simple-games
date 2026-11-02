@@ -12,8 +12,18 @@ BUGS AND ISSUES
 
 TODO FEATURE 
 
-ADD MANUAL GEAR STICK
+make the steering wheel stiffer 
+
+add a challange of imitating a photo 
 
 and a steering wheel graphics?
 
-make the front wheels dynamically rotate 
+
+
+
+
+PARAMETER VALUES 
+
+trailer length: 95
+
+reverse multiplier: - 0.6

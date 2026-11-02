@@ -83,6 +83,8 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
 <label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
 <label class="row"><span class="label">Grass Regrowth (GR)</span><input id="GR" class="slider" type="range" min="1" max="60" step="0.5" value="11.5"><span id="GRv" class="val">11.5s</span></label>
+<label class="row"><span class="label">Grass Length Levels</span><input id="grassLevels" class="slider" type="range" min="1" max="10" step="1" value="5"><span id="grassLevelsv" class="val">5</span></label>
+<label class="row"><span class="label">Cut Strength (S1)</span><input id="S1" class="slider" type="range" min="1" max="10" step="1" value="1"><span id="S1v" class="val">1</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
 </div>
 
@@ -117,8 +119,27 @@ let groundCtx = groundCanvas.getContext('2d');
 let groundColumns = 0;
 let groundRows = 0;
 let groundCells = new Uint8Array(0);
+let lastCutTimes = new Float32Array(0);
+let simulationTime = 0;
+const GRASS_CUT_COOLDOWN = 0.75; // Seconds before a cell can be cut again.
 let grassGrowthAccumulator = 0;
-const GRASS_COLORS = ['#62df55', '#52c94a', '#43ae40', '#358f36', '#286f2e', '#1d5427'];
+const GRASS_COLOR_STOPS = ['#62df55', '#52c94a', '#43ae40', '#358f36', '#286f2e', '#1d5427'];
+
+function grassColor(level) {
+    const maxLevel = Math.max(1, Math.round(S.grassLevels));
+    const position = Math.max(0, Math.min(1, level / maxLevel)) *
+        (GRASS_COLOR_STOPS.length - 1);
+    const lower = Math.floor(position);
+    const upper = Math.min(GRASS_COLOR_STOPS.length - 1, lower + 1);
+    const amount = position - lower;
+
+    const a = GRASS_COLOR_STOPS[lower].match(/[a-f0-9]{2}/gi).map(v => parseInt(v, 16));
+    const b = GRASS_COLOR_STOPS[upper].match(/[a-f0-9]{2}/gi).map(v => parseInt(v, 16));
+    const rgb = a.map((channel, i) =>
+        Math.round(channel + (b[i] - channel) * amount)
+    );
+    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
 
 function resize() {
     dpr = window.devicePixelRatio || 1;
@@ -133,7 +154,6 @@ function resize() {
 }
 
 window.addEventListener('resize', resize);
-resize();
 
 // -----------------------------------------------------------------------------
 // Simulation settings and state
@@ -146,12 +166,17 @@ const settings = {
     maxSteer: 57,
     paintDiameter: 60,
     GR: 11.5,
+    grassLevels: 5,
+    S1: 1,
     len: 137,
     vs: 1,
     ts: 1
 };
 
 const S = { ...settings };
+
+// Initialize the canvas and ground only after the settings object exists.
+resize();
 
 let edit = false;
 let paint = false;
@@ -203,6 +228,8 @@ const settingFormats = {
     maxSteer: value => `${value}°`,
     paintDiameter: value => value,
     GR: value => `${value.toFixed(1)}s`,
+    grassLevels: value => String(Math.round(value)),
+    S1: value => String(Math.round(value)),
     len: value => value,
     vs: value => value.toFixed(2),
     ts: value => value.toFixed(2)
@@ -225,6 +252,14 @@ function bind(id, key) {
 
     element.oninput = () => {
         S[key] = Number(element.value);
+        if (key === 'grassLevels') {
+            S.grassLevels = Math.round(S.grassLevels);
+            for (let i = 0; i < groundCells.length; i++) {
+                groundCells[i] = Math.min(groundCells[i], S.grassLevels);
+            }
+            drawGroundBase();
+        }
+        if (key === 'S1') S.S1 = Math.round(S.S1);
         syncSettingsToUI();
     };
 }
@@ -449,6 +484,12 @@ document.getElementById('load').onchange = async event => {
             }
         }
 
+        S.grassLevels = Math.max(1, Math.min(10, Math.round(S.grassLevels)));
+        S.S1 = Math.max(1, Math.min(10, Math.round(S.S1)));
+        for (let i = 0; i < groundCells.length; i++) {
+            groundCells[i] = Math.min(groundCells[i], S.grassLevels);
+        }
+        drawGroundBase();
         syncSettingsToUI();
     } catch (error) {
         alert('Invalid stage file');
@@ -604,6 +645,7 @@ function vehicleAndTrailerHitObstacle(trailerState) {
 // -----------------------------------------------------------------------------
 
 function update(dt) {
+    simulationTime += dt;
     const gearRatio = currentGear;
     const directionMultiplier =
         driveDirection === 1 ? 1 : S.reverseMultiplier;
@@ -743,7 +785,7 @@ function update(dt) {
             const y = row * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
             for (let column = 0; column < groundColumns; column++) {
                 const index = row * groundColumns + column;
-                if (groundCells[index] >= 5) continue;
+                if (groundCells[index] >= S.grassLevels) continue;
                 const x = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
                 if (isPointInsideObstacle(x, y)) continue;
                 groundCells[index]++;
@@ -805,7 +847,9 @@ function initializeGround() {
 
     // A new field starts with fully grown grass.
     groundCells = new Uint8Array(groundColumns * groundRows);
-    groundCells.fill(5);
+    groundCells.fill(Math.round(S.grassLevels));
+    lastCutTimes = new Float32Array(groundColumns * groundRows);
+    lastCutTimes.fill(-Infinity);
     grassGrowthAccumulator = 0;
 
     groundCanvas.width = Math.max(1, W);
@@ -826,14 +870,14 @@ function isPointInsideObstacle(x, y) {
 }
 
 function drawGroundBase() {
-    groundCtx.fillStyle = GRASS_COLORS[5];
+    groundCtx.fillStyle = grassColor(S.grassLevels);
     groundCtx.fillRect(0, 0, W, H);
 
     for (let row = 0; row < groundRows; row++) {
         const y = row * GROUND_CELL_SIZE;
         for (let column = 0; column < groundColumns; column++) {
-            const level = Math.min(5, groundCells[row * groundColumns + column]);
-            groundCtx.fillStyle = GRASS_COLORS[level];
+            const level = Math.min(S.grassLevels, groundCells[row * groundColumns + column]);
+            groundCtx.fillStyle = grassColor(level);
             groundCtx.fillRect(
                 column * GROUND_CELL_SIZE, y,
                 GROUND_CELL_SIZE, GROUND_CELL_SIZE
@@ -878,9 +922,18 @@ function paintGroundCircle(x, y, radius) {
             if (isPointInsideObstacle(centerX, centerY)) continue;
 
             const index = row * groundColumns + column;
-            if (groundCells[index] === 0) continue;
-            groundCells[index] = 0;
-            groundCtx.fillStyle = GRASS_COLORS[0];
+
+            // A cell can only be cut once per cooldown interval, regardless
+            // of how many overlapping paint circles pass over it.
+            if (simulationTime - lastCutTimes[index] < GRASS_CUT_COOLDOWN) continue;
+
+            const previousLevel = groundCells[index];
+            const nextLevel = Math.max(0, previousLevel - Math.round(S.S1));
+            if (nextLevel === previousLevel) continue;
+
+            groundCells[index] = nextLevel;
+            lastCutTimes[index] = simulationTime;
+            groundCtx.fillStyle = grassColor(nextLevel);
             groundCtx.fillRect(
                 column * GROUND_CELL_SIZE, row * GROUND_CELL_SIZE,
                 GROUND_CELL_SIZE, GROUND_CELL_SIZE
@@ -903,7 +956,8 @@ function drawGroundGridLines() { /*
 }
 
 function clearGroundPaint() {
-    groundCells.fill(5);
+    groundCells.fill(Math.round(S.grassLevels));
+    lastCutTimes.fill(-Infinity);
     grassGrowthAccumulator = 0;
     drawGroundBase();
 }
