@@ -12,11 +12,15 @@ BUGS AND ISSUES
 
 TODO FEATURE 
 
-make the steering wheel stiffer 
+add bonus object in the form of different colored grass, upon mowing entering a more powerful mower for a while - larger mowing diameter 
+
+make the steering wheel stiffer G
 
 add a challange of imitating a photo 
 
 and a steering wheel graphics?
+
+add the possibility to remove objects on edit mode 
 
 
 

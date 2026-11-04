@@ -80,8 +80,8 @@
     "maxSteer": 57,
     "paintDiameter": 60,
     "GR": 13.5,
-    "grassLevels": 10,
-    "S1": 3,
+    "grassLevels": 50,
+    "S1": 35,
     "len": 104,
     "vs": 0.65,
     "ts": 0.6

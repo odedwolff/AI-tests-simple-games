@@ -83,8 +83,8 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <label class="row"><span class="label">Maximum Steering Angle</span><input id="maxSteer" class="slider" type="range" min="5" max="60" step="1" value="35"><span id="maxSteerv" class="val">35°</span></label>
 <label class="row"><span class="label">Paint Diameter</span><input id="paintDiameter" class="slider" type="range" min="20" max="200" step="1" value="95"><span id="paintDiameterv" class="val">95</span></label>
 <label class="row"><span class="label">Grass Regrowth (GR)</span><input id="GR" class="slider" type="range" min="1" max="60" step="0.5" value="11.5"><span id="GRv" class="val">11.5s</span></label>
-<label class="row"><span class="label">Grass Length Levels</span><input id="grassLevels" class="slider" type="range" min="1" max="10" step="1" value="5"><span id="grassLevelsv" class="val">5</span></label>
-<label class="row"><span class="label">Cut Strength (S1)</span><input id="S1" class="slider" type="range" min="1" max="10" step="1" value="1"><span id="S1v" class="val">1</span></label>
+<label class="row"><span class="label">Grass Length Levels</span><input id="grassLevels" class="slider" type="range" min="1" max="100" step="1" value="50"><span id="grassLevelsv" class="val">5</span></label>
+<label class="row"><span class="label">Cut Strength (S1)</span><input id="S1" class="slider" type="range" min="1" max="100" step="1" value="35"><span id="S1v" class="val">1</span></label>
 <label class="row"><span class="label">Trailer Length</span><input id="len" class="slider" type="range" min="35" max="180" value="95"><span id="lenv" class="val">95</span></label>
 </div>
 
@@ -166,8 +166,8 @@ const settings = {
     maxSteer: 57,
     paintDiameter: 60,
     GR: 11.5,
-    grassLevels: 5,
-    S1: 1,
+    grassLevels: 50,
+    S1: 35,
     len: 137,
     vs: 1,
     ts: 1
@@ -484,11 +484,12 @@ document.getElementById('load').onchange = async event => {
             }
         }
 
-        S.grassLevels = Math.max(1, Math.min(10, Math.round(S.grassLevels)));
-        S.S1 = Math.max(1, Math.min(10, Math.round(S.S1)));
-        for (let i = 0; i < groundCells.length; i++) {
-            groundCells[i] = Math.min(groundCells[i], S.grassLevels);
-        }
+        S.grassLevels = Math.max(1, Math.min(100, Math.round(S.grassLevels)));
+        S.S1 = Math.max(1, Math.min(100, Math.round(S.S1)));
+        // Loading a stage resets the whole field to the configured grass height.
+        groundCells.fill(Math.round(S.grassLevels));
+        lastCutTimes.fill(-Infinity);
+        grassGrowthAccumulator = 0;
         drawGroundBase();
         syncSettingsToUI();
     } catch (error) {
