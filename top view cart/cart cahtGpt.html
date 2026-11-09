@@ -27,6 +27,8 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 .label{font-size:13px;flex:1}
 .hint{font-size:11px;color:#999;line-height:1.35}
 .status{position:absolute;left:10px;top:10px;background:#000a;padding:7px 9px;border-radius:5px;font-size:12px}
+.scoreOverlay{position:absolute;right:10px;top:10px;background:#000b;border:1px solid #555;padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;min-width:110px;text-align:center}
+.scoreLabel{font-size:10px;color:#aaa;font-weight:500;letter-spacing:.06em;margin-bottom:2px}
 .gearOverlay{position:absolute;left:10px;bottom:10px;background:#000b;border:1px solid #555;padding:8px 11px;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;min-width:112px}
 .gearNumber{font-size:20px;line-height:1}
 .gearDirection{font-size:20px;line-height:1;color:#ddd}
@@ -45,6 +47,7 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <div class="canvasWrap">
 <canvas id="c" class="canvas"></canvas>
 <div id="status" class="status">DRIVE</div>
+<div class="scoreOverlay"><div class="scoreLabel">CUT</div><div id="cutPercentage">0.0%</div></div>
 <div id="gearOverlay" class="gearOverlay"><div><div class="gearLabel">GEAR</div><div id="gearNumber" class="gearNumber">1</div></div><div id="gearDirection" class="gearDirection" aria-label="Forward direction">↑</div></div>
 </div>
 
@@ -123,6 +126,8 @@ let lastCutTimes = new Float32Array(0);
 let simulationTime = 0;
 const GRASS_CUT_COOLDOWN = 0.75; // Seconds before a cell can be cut again.
 let grassGrowthAccumulator = 0;
+let fullGrassGrowth = 0;
+let currentGrassGrowth = 0;
 const GRASS_COLOR_STOPS = ['#62df55', '#52c94a', '#43ae40', '#358f36', '#286f2e', '#1d5427'];
 
 function grassColor(level) {
@@ -139,6 +144,34 @@ function grassColor(level) {
         Math.round(channel + (b[i] - channel) * amount)
     );
     return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
+function calculateFullGrassGrowth() {
+    const maxLevel = Math.max(1, Math.round(S.grassLevels));
+    let eligibleCells = 0;
+    currentGrassGrowth = 0;
+
+    for (let row = 0; row < groundRows; row++) {
+        const y = row * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+        for (let column = 0; column < groundColumns; column++) {
+            const index = row * groundColumns + column;
+            const x = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+            if (isPointInsideObstacle(x, y)) continue;
+            eligibleCells++;
+            currentGrassGrowth += Math.min(maxLevel, groundCells[index]);
+        }
+    }
+
+    fullGrassGrowth = eligibleCells * maxLevel;
+    updateCutPercentage();
+}
+
+function updateCutPercentage() {
+    const percentage = fullGrassGrowth > 0
+        ? 100 * (fullGrassGrowth - currentGrassGrowth) / fullGrassGrowth
+        : 0;
+    document.getElementById('cutPercentage').textContent =
+        `${Math.max(0, Math.min(100, percentage)).toFixed(1)}%`;
 }
 
 function resize() {
@@ -174,6 +207,7 @@ const settings = {
 };
 
 const S = { ...settings };
+let obstacles = [];
 
 // Initialize the canvas and ground only after the settings object exists.
 resize();
@@ -183,7 +217,6 @@ let paint = false;
 let keys = {};
 let currentGear = 1;
 let driveDirection = 1;
-let obstacles = [];
 let lastPaintPosition = null;
 let drag = null;
 let lastMouse = { x: 0, y: 0 };
@@ -258,6 +291,7 @@ function bind(id, key) {
                 groundCells[i] = Math.min(groundCells[i], S.grassLevels);
             }
             drawGroundBase();
+            calculateFullGrassGrowth();
         }
         if (key === 'S1') S.S1 = Math.round(S.S1);
         syncSettingsToUI();
@@ -359,10 +393,12 @@ document.getElementById('clearTracks').onclick = () => {
 
 document.getElementById('clear').onclick = () => {
     obstacles = [];
+    calculateFullGrassGrowth();
 };
 
 document.getElementById('undo').onclick = () => {
     obstacles.pop();
+    calculateFullGrassGrowth();
 };
 
 // -----------------------------------------------------------------------------
@@ -395,6 +431,7 @@ canvas.addEventListener('contextmenu', event => {
 
         if (inside) {
             obstacles.splice(i, 1);
+            calculateFullGrassGrowth();
             break;
         }
     }
@@ -433,6 +470,7 @@ canvas.addEventListener('mouseup', event => {
 
     if (w > 8 && h > 8) {
         obstacles.push({ x, y, w, h });
+        calculateFullGrassGrowth();
     }
 
     drag = null;
@@ -491,6 +529,7 @@ document.getElementById('load').onchange = async event => {
         lastCutTimes.fill(-Infinity);
         grassGrowthAccumulator = 0;
         drawGroundBase();
+        calculateFullGrassGrowth();
         syncSettingsToUI();
     } catch (error) {
         alert('Invalid stage file');
@@ -790,11 +829,15 @@ function update(dt) {
                 const x = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
                 if (isPointInsideObstacle(x, y)) continue;
                 groundCells[index]++;
+                currentGrassGrowth++;
                 grassChanged = true;
             }
         }
     }
-    if (grassChanged) drawGroundBase();
+    if (grassChanged) {
+        drawGroundBase();
+        updateCutPercentage();
+    }
 
     // Paint the fixed ground grid. No track-point objects accumulate.
     if (paint) {
@@ -858,6 +901,7 @@ function initializeGround() {
     groundCtx = groundCanvas.getContext('2d');
 
     drawGroundBase();
+    calculateFullGrassGrowth();
 }
 
 function isPointInsideObstacle(x, y) {
@@ -933,6 +977,7 @@ function paintGroundCircle(x, y, radius) {
             if (nextLevel === previousLevel) continue;
 
             groundCells[index] = nextLevel;
+            currentGrassGrowth += nextLevel - previousLevel;
             lastCutTimes[index] = simulationTime;
             groundCtx.fillStyle = grassColor(nextLevel);
             groundCtx.fillRect(
@@ -942,7 +987,10 @@ function paintGroundCircle(x, y, radius) {
             changed = true;
         }
     }
-    if (changed) drawGroundGridLines();
+    if (changed) {
+        drawGroundGridLines();
+        updateCutPercentage();
+    }
 }
 
 function drawGroundGridLines() { /*
@@ -961,6 +1009,7 @@ function clearGroundPaint() {
     lastCutTimes.fill(-Infinity);
     grassGrowthAccumulator = 0;
     drawGroundBase();
+    calculateFullGrassGrowth();
 }
 
 function drawGrid() {

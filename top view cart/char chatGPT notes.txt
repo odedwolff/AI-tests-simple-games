@@ -14,6 +14,8 @@ TODO FEATURE
 
 add bonus object in the form of different colored grass, upon mowing entering a more powerful mower for a while - larger mowing diameter 
 
+add bonus object to change the size of the trailer. make it bigger or narwoer (each of which could be beneficial in certain cases)
+
 make the steering wheel stiffer G
 
 add a challange of imitating a photo 
@@ -21,6 +23,7 @@ add a challange of imitating a photo
 and a steering wheel graphics?
 
 add the possibility to remove objects on edit mode 
+
 
 
 
