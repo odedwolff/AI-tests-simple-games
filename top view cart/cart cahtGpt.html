@@ -56,9 +56,18 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 <h3>Level Editor</h3>
 <div class="row"><button id="mode" class="btn">Switch to Edit Mode</button></div>
 <div class="row">
-<button id="undo" class="btn">Undo Last Obstacle</button>
+<button id="undo" class="btn">Undo Last Object</button>
 <button id="clear" class="btn">Clear All</button>
 </div>
+<div class="row">
+<select id="specialType" class="btn" style="min-width:0;flex:1">
+<option value="ξ">Greek xi (ξ)</option><option value="φ">Greek phi (φ)</option><option value="ω">Greek omega (ω)</option>
+<option value="前">前</option><option value="的">的</option><option value="方">方</option><option value="合">合</option>
+<option value="١">Arabic 1 (١)</option><option value="٢">Arabic 2 (٢)</option><option value="٣">Arabic 3 (٣)</option><option value="٤">Arabic 4 (٤)</option>
+</select>
+</div>
+<div class="row"><button id="placeSpecial" class="btn">Place Special Object: OFF</button></div>
+<div class="hint">Select a symbol, enable placement, then click the stage to place a 50 × 50 object. Right-click any object to delete it.</div>
 </div>
 
 <div class="section">
@@ -99,8 +108,8 @@ html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,sans-serif;backgro
 
 <div class="section hint">
 Drive mode: press R to reset the vehicle and trailer to their initial position.
-Edit mode: left-drag creates a rectangular obstacle; right-click removes the obstacle under the cursor.
-Stage files contain obstacles and current settings.
+Edit mode: left-drag creates a rectangular obstacle; select Place Special Object to add symbols; right-click deletes objects.
+Stage files contain obstacles, special objects, and current settings.
 </div>
 </aside>
 </div>
@@ -208,6 +217,8 @@ const settings = {
 
 const S = { ...settings };
 let obstacles = [];
+let specialObjects = [];
+let placeSpecialMode = false;
 
 // Initialize the canvas and ground only after the settings object exists.
 resize();
@@ -393,12 +404,21 @@ document.getElementById('clearTracks').onclick = () => {
 
 document.getElementById('clear').onclick = () => {
     obstacles = [];
+    specialObjects = [];
     calculateFullGrassGrowth();
 };
 
 document.getElementById('undo').onclick = () => {
-    obstacles.pop();
+    if (specialObjects.length) specialObjects.pop();
+    else obstacles.pop();
     calculateFullGrassGrowth();
+};
+
+document.getElementById('placeSpecial').onclick = () => {
+    placeSpecialMode = !placeSpecialMode;
+    const button = document.getElementById('placeSpecial');
+    button.textContent = `Place Special Object: ${placeSpecialMode ? 'ON' : 'OFF'}`;
+    button.classList.toggle('active', placeSpecialMode);
 };
 
 // -----------------------------------------------------------------------------
@@ -415,21 +435,21 @@ function pointFromEvent(event) {
 
 canvas.addEventListener('contextmenu', event => {
     event.preventDefault();
-
     if (!edit) return;
-
     const point = pointFromEvent(event);
 
+    for (let i = specialObjects.length - 1; i >= 0; i--) {
+        const object = specialObjects[i];
+        if (point.x >= object.x && point.x <= object.x + 50 &&
+            point.y >= object.y && point.y <= object.y + 50) {
+            specialObjects.splice(i, 1);
+            return;
+        }
+    }
     for (let i = obstacles.length - 1; i >= 0; i--) {
         const obstacle = obstacles[i];
-
-        const inside =
-            point.x >= obstacle.x &&
-            point.x <= obstacle.x + obstacle.w &&
-            point.y >= obstacle.y &&
-            point.y <= obstacle.y + obstacle.h;
-
-        if (inside) {
+        if (point.x >= obstacle.x && point.x <= obstacle.x + obstacle.w &&
+            point.y >= obstacle.y && point.y <= obstacle.y + obstacle.h) {
             obstacles.splice(i, 1);
             calculateFullGrassGrowth();
             break;
@@ -441,6 +461,14 @@ canvas.addEventListener('mousedown', event => {
     if (!edit || event.button !== 0) return;
 
     const point = pointFromEvent(event);
+    if (placeSpecialMode) {
+        specialObjects.push({
+            x: point.x - 25,
+            y: point.y - 25,
+            symbol: document.getElementById('specialType').value
+        });
+        return;
+    }
 
     drag = {
         x: point.x,
@@ -483,6 +511,7 @@ canvas.addEventListener('mouseup', event => {
 function saveStage() {
     const data = {
         obstacles,
+        specialObjects,
         S
     };
 
@@ -513,6 +542,7 @@ document.getElementById('load').onchange = async event => {
     try {
         const data = JSON.parse(await file.text());
         obstacles = Array.isArray(data.obstacles) ? data.obstacles : [];
+        specialObjects = Array.isArray(data.specialObjects) ? data.specialObjects : [];
 
         if (data.S) {
             for (const key of Object.keys(settings)) {
@@ -681,6 +711,44 @@ function vehicleAndTrailerHitObstacle(trailerState) {
 }
 
 // -----------------------------------------------------------------------------
+function collectSpecialObjectsWithTrailer(trailerState) {
+    const trailerPolygon = rectangleCorners(
+        trailerState.ax, trailerState.ay, 84 * S.ts, 56 * S.ts, trailerState.a
+    );
+    let collected = false;
+
+    for (let i = specialObjects.length - 1; i >= 0; i--) {
+        const object = specialObjects[i];
+        const objectPolygon = rectangleCorners(object.x + 25, object.y + 25, 50, 50, 0);
+        if (!polygonsOverlap(trailerPolygon, objectPolygon)) continue;
+
+        const minColumn = Math.max(0, Math.floor(object.x / GROUND_CELL_SIZE));
+        const maxColumn = Math.min(groundColumns - 1, Math.floor((object.x + 50) / GROUND_CELL_SIZE));
+        const minRow = Math.max(0, Math.floor(object.y / GROUND_CELL_SIZE));
+        const maxRow = Math.min(groundRows - 1, Math.floor((object.y + 50) / GROUND_CELL_SIZE));
+
+        for (let row = minRow; row <= maxRow; row++) {
+            for (let column = minColumn; column <= maxColumn; column++) {
+                const cellX = column * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+                const cellY = row * GROUND_CELL_SIZE + GROUND_CELL_SIZE / 2;
+                if (cellX < object.x || cellX > object.x + 50 ||
+                    cellY < object.y || cellY > object.y + 50) continue;
+                const index = row * groundColumns + column;
+                currentGrassGrowth += Math.round(S.grassLevels) - groundCells[index];
+                groundCells[index] = Math.round(S.grassLevels);
+                lastCutTimes[index] = -Infinity;
+            }
+        }
+        specialObjects.splice(i, 1);
+        collected = true;
+    }
+
+    if (collected) {
+        drawGroundBase();
+        calculateFullGrassGrowth();
+    }
+}
+
 // Simulation update
 // -----------------------------------------------------------------------------
 
@@ -815,6 +883,9 @@ function update(dt) {
 
         trailerState = trailer();
     }
+
+    // Only the trailer's final, collision-resolved position can collect symbols.
+    collectSpecialObjectsWithTrailer(trailerState);
 
     // Grass regrows in discrete stages, once every GR seconds.
     grassGrowthAccumulator += dt;
@@ -1054,6 +1125,21 @@ function drawObstacles() {
     }
 }
 
+function drawSpecialObjects() {
+    for (const object of specialObjects) {
+        ctx.fillStyle = '#fff4c2';
+        ctx.fillRect(object.x, object.y, 50, 50);
+        ctx.strokeStyle = '#5b4218';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(object.x, object.y, 50, 50);
+        ctx.fillStyle = '#222';
+        ctx.font = 'bold 36px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(object.symbol, object.x + 25, object.y + 26);
+    }
+}
+
 function drawTrailer(trailerState) {
     const scale = S.ts;
 
@@ -1177,6 +1263,7 @@ function draw() {
 
     drawGrid();
     drawObstacles();
+    drawSpecialObjects();
 
     const trailerState = trailer();
     drawTrailer(trailerState);
