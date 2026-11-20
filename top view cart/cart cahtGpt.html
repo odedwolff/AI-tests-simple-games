@@ -570,19 +570,15 @@ document.getElementById('load').onchange = async event => {
 // Trailer kinematics
 // -----------------------------------------------------------------------------
 
-function trailer() {
-    const drawbarLength = S.len;
+// Advance the trailer heading exactly once per simulation step. Keeping this
+// separate from trailer() makes position calculations safe to call for drawing
+// and collision tests without accidentally changing the simulation state.
+function advanceTrailerHeading(dt) {
     const vehicleDirectionX = Math.cos(car.a);
     const vehicleDirectionY = Math.sin(car.a);
-
-    const hitchX = car.x - vehicleDirectionX * 42 * S.vs;
-    const hitchY = car.y - vehicleDirectionY * 42 * S.vs;
-
-    const trailerHeading = car.ta;
-    const omega = car.omega || 0;
-
     const hitchOffsetX = -42 * S.vs * vehicleDirectionX;
     const hitchOffsetY = -42 * S.vs * vehicleDirectionY;
+    const omega = car.omega || 0;
 
     const hitchVelocityX =
         car.v * vehicleDirectionX - omega * hitchOffsetY;
@@ -590,15 +586,22 @@ function trailer() {
         car.v * vehicleDirectionY + omega * hitchOffsetX;
 
     const sidewaysVelocity =
-        -Math.sin(trailerHeading) * hitchVelocityX +
-        Math.cos(trailerHeading) * hitchVelocityY;
+        -Math.sin(car.ta) * hitchVelocityX +
+        Math.cos(car.ta) * hitchVelocityY;
+    const angularRate = sidewaysVelocity / Math.max(1, S.len);
 
-    const angularRate = sidewaysVelocity / Math.max(1, drawbarLength);
-    car.ta = trailerHeading + angularRate * car.dt;
-
+    car.ta += angularRate * dt;
     while (car.ta > Math.PI) car.ta -= 2 * Math.PI;
     while (car.ta < -Math.PI) car.ta += 2 * Math.PI;
+}
 
+// Pure geometry calculation: this function never changes vehicle or trailer state.
+function trailer() {
+    const drawbarLength = S.len;
+    const vehicleDirectionX = Math.cos(car.a);
+    const vehicleDirectionY = Math.sin(car.a);
+    const hitchX = car.x - vehicleDirectionX * 42 * S.vs;
+    const hitchY = car.y - vehicleDirectionY * 42 * S.vs;
     const axleX = hitchX - Math.cos(car.ta) * drawbarLength;
     const axleY = hitchY - Math.sin(car.ta) * drawbarLength;
 
@@ -634,80 +637,125 @@ function rectangleCorners(centerX, centerY, width, height, angle) {
     }));
 }
 
-function polygonsOverlap(first, second) {
+function polygonMinimumTranslation(first, second) {
+    let bestDepth = Infinity;
+    let bestX = 0;
+    let bestY = 0;
     const polygons = [first, second];
 
     for (const polygon of polygons) {
         for (let i = 0; i < polygon.length; i++) {
             const a = polygon[i];
             const b = polygon[(i + 1) % polygon.length];
+            let axisX = -(b.y - a.y);
+            let axisY = b.x - a.x;
+            const axisLength = Math.hypot(axisX, axisY);
+            if (axisLength < 1e-9) continue;
+            axisX /= axisLength;
+            axisY /= axisLength;
 
-            const edgeX = b.x - a.x;
-            const edgeY = b.y - a.y;
-            const axisX = -edgeY;
-            const axisY = edgeX;
-
-            let firstMin = Infinity;
-            let firstMax = -Infinity;
-            let secondMin = Infinity;
-            let secondMax = -Infinity;
-
+            let firstMin = Infinity, firstMax = -Infinity;
+            let secondMin = Infinity, secondMax = -Infinity;
             for (const point of first) {
                 const projection = point.x * axisX + point.y * axisY;
                 firstMin = Math.min(firstMin, projection);
                 firstMax = Math.max(firstMax, projection);
             }
-
             for (const point of second) {
                 const projection = point.x * axisX + point.y * axisY;
                 secondMin = Math.min(secondMin, projection);
                 secondMax = Math.max(secondMax, projection);
             }
 
-            if (firstMax < secondMin || secondMax < firstMin) {
-                return false;
+            // A zero/negative overlap means the polygons are separated or
+            // merely touching; no penetration correction is required.
+            if (firstMax <= secondMin || secondMax <= firstMin) return null;
+
+            // Choose the shorter direction that moves the first polygon clear
+            // of the second, including the case where one polygon contains another.
+            const moveNegative = firstMax - secondMin;
+            const movePositive = secondMax - firstMin;
+            const depth = Math.min(moveNegative, movePositive);
+            const direction = moveNegative <= movePositive ? -1 : 1;
+
+            if (depth < bestDepth) {
+                bestDepth = depth;
+                bestX = axisX * direction;
+                bestY = axisY * direction;
             }
         }
     }
 
-    return true;
+    return Number.isFinite(bestDepth)
+        ? { x: bestX, y: bestY, depth: bestDepth }
+        : null;
+}
+
+function getRigPolygons(trailerState) {
+    return [
+        rectangleCorners(car.x, car.y, 90 * S.vs, 50 * S.vs, car.a),
+        rectangleCorners(trailerState.ax, trailerState.ay,
+            84 * S.ts, 56 * S.ts, trailerState.a)
+    ];
+}
+
+function getObstaclePolygon(obstacle) {
+    return [
+        { x: obstacle.x, y: obstacle.y },
+        { x: obstacle.x + obstacle.w, y: obstacle.y },
+        { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h },
+        { x: obstacle.x, y: obstacle.y + obstacle.h }
+    ];
 }
 
 function vehicleAndTrailerHitObstacle(trailerState) {
-    const vehicleWidth = 90 * S.vs;
-    const vehicleHeight = 50 * S.vs;
-    const trailerWidth = 84 * S.ts;
-    const trailerHeight = 56 * S.ts;
-
-    const vehiclePolygon = rectangleCorners(
-        car.x, car.y, vehicleWidth, vehicleHeight, car.a
-    );
-
-    const trailerPolygon = rectangleCorners(
-        trailerState.ax,
-        trailerState.ay,
-        trailerWidth,
-        trailerHeight,
-        trailerState.a
-    );
-
+    const rigPolygons = getRigPolygons(trailerState);
     for (const obstacle of obstacles) {
-        const obstaclePolygon = [
-            { x: obstacle.x, y: obstacle.y },
-            { x: obstacle.x + obstacle.w, y: obstacle.y },
-            { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h },
-            { x: obstacle.x, y: obstacle.y + obstacle.h }
-        ];
-
-        if (
-            polygonsOverlap(vehiclePolygon, obstaclePolygon) ||
-            polygonsOverlap(trailerPolygon, obstaclePolygon)
-        ) {
-            return true;
+        const obstaclePolygon = getObstaclePolygon(obstacle);
+        for (const rigPolygon of rigPolygons) {
+            if (polygonMinimumTranslation(rigPolygon, obstaclePolygon)) return true;
         }
     }
-
     return false;
+}
+
+// Resolve penetration by translating the complete connected rig. Rechecking
+// after every correction accounts for the fact that moving the car also moves
+// the trailer, and vice versa.
+function resolveRigObstacleCollisions() {
+    const MAX_CORRECTION_ITERATIONS = 16;
+    const SEPARATION_EPSILON = 0.02;
+    let correctedAny = false;
+
+    for (let iteration = 0; iteration < MAX_CORRECTION_ITERATIONS; iteration++) {
+        const trailerState = trailer();
+        const rigPolygons = getRigPolygons(trailerState);
+        let smallestCorrection = null;
+
+        for (const obstacle of obstacles) {
+            const obstaclePolygon = getObstaclePolygon(obstacle);
+            for (const rigPolygon of rigPolygons) {
+                const correction = polygonMinimumTranslation(rigPolygon, obstaclePolygon);
+                if (correction && (!smallestCorrection ||
+                    correction.depth < smallestCorrection.depth)) {
+                    smallestCorrection = correction;
+                }
+            }
+        }
+
+        if (!smallestCorrection) return { clear: true, corrected: correctedAny };
+
+        const amount = smallestCorrection.depth + SEPARATION_EPSILON;
+        car.x += smallestCorrection.x * amount;
+        car.y += smallestCorrection.y * amount;
+        correctedAny = true;
+    }
+
+    // One final check: never accept a pose that is still penetrating an obstacle.
+    return {
+        clear: !vehicleAndTrailerHitObstacle(trailer()),
+        corrected: correctedAny
+    };
 }
 
 // -----------------------------------------------------------------------------
@@ -782,107 +830,54 @@ function update(dt) {
 
     car.omega = turnRate;
 
-    const oldState = {
-        x: car.x,
-        y: car.y,
-        a: car.a,
-        v: car.v,
-        steer: car.steer,
-        omega: car.omega,
-        ta: car.ta
-    };
-
-    car.a += turnRate * dt;
-    car.x += Math.cos(car.a) * car.v * dt;
-    car.y += Math.sin(car.a) * car.v * dt;
-    car.dt = dt;
-
+    // Substep the movement so neither body can jump across a thin obstacle
+    // between collision checks. Rotation is included because the trailer has
+    // a long lever arm and can sweep a substantial distance while turning.
+    const totalDistance = Math.abs(car.v * dt);
+    const totalAngle = Math.abs(turnRate * dt);
+    const sweepRadius = Math.max(90 * S.vs, S.len + 90 * S.ts + 42 * S.vs);
+    const maximumStepTravel = Math.max(totalDistance, totalAngle * sweepRadius);
+    const substeps = Math.max(1, Math.min(240, Math.ceil(maximumStepTravel / 3)));
+    const stepDt = dt / substeps;
     const vehicleRadius = 45 * S.vs;
 
-    if (car.x < vehicleRadius) {
-        car.x = vehicleRadius;
-        car.v = 0;
-    }
-
-    if (car.x > W - vehicleRadius) {
-        car.x = W - vehicleRadius;
-        car.v = 0;
-    }
-
-    if (car.y < vehicleRadius) {
-        car.y = vehicleRadius;
-        car.v = 0;
-    }
-
-    if (car.y > H - vehicleRadius) {
-        car.y = H - vehicleRadius;
-        car.v = 0;
-    }
-
-    let trailerState = trailer();
-
-    if (vehicleAndTrailerHitObstacle(trailerState)) {
-        const attemptedState = {
+    for (let step = 0; step < substeps; step++) {
+        const previousState = {
             x: car.x,
             y: car.y,
             a: car.a,
             ta: car.ta
         };
 
-        car.x = oldState.x;
-        car.y = oldState.y;
-        car.a = oldState.a;
-        car.ta = oldState.ta;
+        car.a += turnRate * stepDt;
+        car.x += Math.cos(car.a) * car.v * stepDt;
+        car.y += Math.sin(car.a) * car.v * stepDt;
+        advanceTrailerHeading(stepDt);
 
-        // Try sliding horizontally.
-        car.x = attemptedState.x;
-        car.y = oldState.y;
-        car.a = attemptedState.a;
-        car.ta = oldState.ta;
+        // Retain the existing canvas-edge constraint.
+        car.x = Math.max(vehicleRadius, Math.min(W - vehicleRadius, car.x));
+        car.y = Math.max(vehicleRadius, Math.min(H - vehicleRadius, car.y));
 
-        trailerState = trailer();
-        const horizontalClear =
-            !vehicleAndTrailerHitObstacle(trailerState);
-
-        // Try sliding vertically.
-        car.ta = oldState.ta;
-        car.x = oldState.x;
-        car.y = attemptedState.y;
-        car.a = attemptedState.a;
-
-        trailerState = trailer();
-        const verticalClear =
-            !vehicleAndTrailerHitObstacle(trailerState);
-
-        if (
-            horizontalClear &&
-            (!verticalClear ||
-             Math.abs(attemptedState.x - oldState.x) >=
-             Math.abs(attemptedState.y - oldState.y))
-        ) {
-            car.x = attemptedState.x;
-            car.y = oldState.y;
-            car.a = attemptedState.a;
-            car.ta = oldState.ta;
+        const collisionResolution = resolveRigObstacleCollisions();
+        if (!collisionResolution.clear) {
+            // If the rig cannot be separated safely, revert to the last known
+            // collision-free pose rather than leaving overlapping bodies stuck.
+            car.x = previousState.x;
+            car.y = previousState.y;
+            car.a = previousState.a;
+            car.ta = previousState.ta;
             car.v = 0;
-        } else if (verticalClear) {
-            car.x = oldState.x;
-            car.y = attemptedState.y;
-            car.a = attemptedState.a;
-            car.ta = oldState.ta;
-            car.v = 0;
-        } else {
-            car.x = oldState.x;
-            car.y = oldState.y;
-            car.a = oldState.a;
-            car.v = 0;
-            car.steer = oldState.steer;
-            car.omega = oldState.omega;
-            car.ta = oldState.ta;
+            break;
         }
-
-        trailerState = trailer();
+        if (collisionResolution.corrected) {
+            // Stop at the contact point instead of repeatedly pushing against
+            // the obstacle during the remaining substeps of this frame.
+            car.v = 0;
+            break;
+        }
     }
+
+    const trailerState = trailer();
 
     // Only the trailer's final, collision-resolved position can collect symbols.
     collectSpecialObjectsWithTrailer(trailerState);

@@ -16,13 +16,20 @@ add bonus object in the form of different colored grass, upon mowing entering a 
 
 add bonus object to change the size of the trailer. make it bigger or narwoer (each of which could be beneficial in certain cases)
 
-make the steering wheel stiffer G
+make the steering wheel stiffer ?
 
 add a challange of imitating a photo 
 
 and a steering wheel graphics?
 
 add the possibility to remove objects on edit mode 
+
+add simple Digger style monsters that can kill the operator if they hit the front, and the operator kill them if they hit the trailer. add sites them omits them at a certain rate and can be added with the stage editor 
+
+add some gardenning artifacts such as tree and bushes
+
+fix the controls Q A not including lower case 
+
 
 
 
